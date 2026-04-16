@@ -2,3 +2,6 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+logfile_DQResultshandler.txt
+pytest_DQResultsHandler.bat

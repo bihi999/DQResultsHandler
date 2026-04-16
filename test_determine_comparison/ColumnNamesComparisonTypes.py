@@ -1,0 +1,153 @@
+import pytest
+
+TestCases = [("Kontaktabgleich", {"Ort", "Vorname",  "Nachname"}),
+             ("Firmenabgleich", {"Firmenname", "Ort"}),
+             ("Unbekannt", {"Firmenname", "Vorname", "Ort"}),
+             ("Unbekannt", {"Position / Funktion_Freifeld", "Firmenname", "Ort"}),
+             ("Unbekannt", {"Firmenname", "Nachname"})]
+                                    
+                                    
+ExtractionCases = [(set(["Ort", "Vorname", "Nachname"]), [
+                                    "Nr.",
+                                    "löschen",
+                                    "%",
+                                    "UnvollständigerDatensatz",
+                                    "Tabelle",
+                                    "Ort",
+                                    "Vorname",
+                                    "Nachname",
+                                    "*(Nicht aendern) Kontakt*",
+                                    "*(Nicht aendern) Zeilenpruefsumme*",
+                                    "*(Nicht aendern) Geaendert am*",
+                                    "*WebID*",
+                                    "*Status*",
+                                    "*Funktion_Freifeld*",
+                                    "*Firmenname*",
+                                    "*Land*",
+                                    "*(Nicht aendern) Lead*",
+                                    "*Position*",
+                                    "*Lead_Category*",
+                                    "*Lead_Status*",
+                                    "*lead_seniority*",
+                                    "*lead_community*",
+                                    "*lead_subcommunity*",
+                                    "*WebID*"
+                                ]),
+                                
+                (set(["Firmenname", "Ort"]), [
+                                    "Nr.",
+                                    "löschen",
+                                    "%",
+                                    "UnvollständigerDatensatz",
+                                    "Tabelle",
+                                    "Firmenname",
+                                    "Ort",
+                                    "*(Nicht aendern) Kontakt*",
+                                    "*(Nicht aendern) Zeilenpruefsumme*",
+                                    "*(Nicht aendern) Geaendert am*",
+                                    "*WebID*",
+                                    "*Status*",
+                                    "*Vorname*",
+                                    "*Nachname*",
+                                    "*Funktion_Freifeld*",
+                                    "*Land*",
+                                    "*(Nicht aendern) Lead*",
+                                    "*Position*",
+                                    "*Lead_Category*",
+                                    "*Lead_Status*",
+                                    "*lead_seniority*",
+                                    "*lead_community*",
+                                    "*lead_subcommunity*",
+                                    "*WebID*"
+                                ]
+                                ),
+                
+                (set(["Firmenname", "Vorname", "Ort"]), 
+                                    [
+                                    "Nr.",
+                                    "löschen",
+                                    "%",
+                                    "UnvollständigerDatensatz",
+                                    "Tabelle",
+                                    "Firmenname",
+                                    "Vorname",
+                                    "Ort",
+                                    "*(Nicht aendern) Kontakt*",
+                                    "*(Nicht aendern) Zeilenpruefsumme*",
+                                    "*(Nicht aendern) Geaendert am*",
+                                    "*WebID*",
+                                    "*Status*",
+                                    "*Nachname*",
+                                    "*Funktion_Freifeld*",
+                                    "*Land*",
+                                    "*(Nicht aendern) Lead*",
+                                    "*Position*",
+                                    "*Lead_Category*",
+                                    "*Lead_Status*",
+                                    "*lead_seniority*",
+                                    "*lead_community*",
+                                    "*lead_subcommunity*",
+                                    "*WebID*"
+                                ]
+                                ),
+                
+                (set(["Position / Funktion_Freifeld", "Firmenname", "Ort"]), [
+                                    "Nr.",
+                                    "löschen",
+                                    "%",
+                                    "UnvollständigerDatensatz",
+                                    "Tabelle",
+                                    "Position / Funktion_Freifeld",
+                                    "Firmenname",
+                                    "Ort",
+                                    "*(Nicht aendern) Kontakt*",
+                                    "*(Nicht aendern) Zeilenpruefsumme*",
+                                    "*(Nicht aendern) Geaendert am*",
+                                    "*WebID*",
+                                    "*Status*",
+                                    "*Vorname*",
+                                    "*Nachname*",
+                                    "*Land*",
+                                    "*(Nicht aendern) Lead*",
+                                    "*Lead_Category*",
+                                    "*Lead_Status*",
+                                    "*lead_seniority*",
+                                    "*lead_community*",
+                                    "*lead_subcommunity*",
+                                    "*WebID*"
+                                ]
+                                ),
+                
+                (set(["Firmenname", "Nachname"]), [
+                                    "Nr.",
+                                    "löschen",
+                                    "%",
+                                    "UnvollständigerDatensatz",
+                                    "Tabelle",
+                                    "Firmenname",
+                                    "Nachname",
+                                    "*(Nicht aendern) Kontakt*",
+                                    "*(Nicht aendern) Zeilenpruefsumme*",
+                                    "*(Nicht aendern) Geaendert am*",
+                                    "*WebID*",
+                                    "*Status*",
+                                    "*Vorname*",
+                                    "*Funktion_Freifeld*",
+                                    "*Ort*",
+                                    "*Land*",
+                                    "*(Nicht aendern) Lead*",
+                                    "*Position*",
+                                    "*Lead_Category*",
+                                    "*Lead_Status*",
+                                    "*lead_seniority*",
+                                    "*lead_community*",
+                                    "*lead_subcommunity*",
+                                    "*WebID*"
+                                ]
+                                ),
+                                
+                                
+                                
+                
+                                
+                                    ]
