@@ -8,6 +8,7 @@ from datetime import datetime
 from classes import class_comparison as cc
 from classes import class_relation as cr
 from excel_functions import excel_classes as ec
+from helper_functions.pandas_functions import export_dataframe_to_excel
 
 DataFrames = {}
 DQComparisonInstanzen = []
@@ -27,9 +28,7 @@ logfile_pfad = skript_pfad / "logfile_DQResultshandler.txt"
 # Zusammengefasster Call
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(module)s - %(message)s', datefmt="%Y-%m-%d %H:%M", filename = logfile_pfad, filemode = "w")
 logger = logging.getLogger(__name__)
-# gimmick zur optischen Gliederung
-logger.info("")
-logger.info("")
+logger.info("\n" * 3)
 logger.info("=== Skript gestartet am %s ===", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
@@ -44,39 +43,6 @@ ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berl
 if ExportEqualsImport or not ExportPath:
     logger.info("Exportpfad gleich Importpfad weil keine Info oder vorgegeben.")
     ExportPath = ImportPath
-
-import os
-import pandas as pd
-
-def export_dataframe_to_excel(df: pd.DataFrame, pfad: str, dateiname: str, logger, zusatz: str = "") -> str:
-    """
-    Exportiert ein DataFrame als Excel-Datei ohne Index.
-    
-    Parameter:
-        df (pd.DataFrame): Das DataFrame, das exportiert werden soll.
-        pfad (str): Zielordner für die Datei.
-        dateiname (str): Dateiname (muss .xlsx enthalten).
-        zusatz (str, optional): Zusatz, der vor der Dateiendung eingefügt wird.
-    
-    """
-   
-    # Dateiendung trennen
-    basis, ext = os.path.splitext(dateiname)
-    if not ext:  # falls keine Endung angegeben, standardmäßig .xlsx
-        ext = ".xlsx"
-    
-    # Zusatz einfügen (falls angegeben)
-    if zusatz:
-        basis = f"{basis}{zusatz}"
-    
-    # Vollständigen Pfad bauen
-    fullpath = os.path.join(pfad, basis + ext)
-    
-    # Export ohne Index
-    df.to_excel(fullpath, index=False, engine="openpyxl")
-    
-    return 
-
 
 # Erstmal provisorisch die neu gestalteten ExcelKlassen integriert - es gibt noch keine expliziten Tests dafür.
 # Die Excelfunktionen haben auch noch keinen Logger.
