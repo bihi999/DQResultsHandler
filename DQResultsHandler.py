@@ -7,8 +7,12 @@ from datetime import datetime
 
 from classes import class_comparison as cc
 from classes import class_relation as cr
+from classes import abandoned_classes     #Reminder: Wurden für Comparison erstellt - aber nie genutzt 
+
 from excel_functions import excel_classes as ec
+
 from helper_functions.pandas_functions import export_dataframe_to_excel
+
 
 DataFrames = {}
 DQComparisonInstanzen = []
@@ -18,14 +22,6 @@ found_relations_valid = []
 skript_pfad = Path(__file__).parent
 logfile_pfad = skript_pfad / "logfile_DQResultshandler.txt"
 
-
-# -------------------------MAIN-------------------------------------
-
-# ImportPath -->> Pfad zur Übergabe und Prüfung an die ef - Funktionen
-# ExportPath -->> Pfad zur Übergabe an die Comparison-Instanz in welche diese die Aufbereiteten Listen schreibt
-# Export = Import - Schalter -->> Schalter in main - dann wird automatisch der Importpfad an die INstanz übergeben
-
-# Zusammengefasster Call
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(module)s - %(message)s', datefmt="%Y-%m-%d %H:%M", filename = logfile_pfad, filemode = "w")
 logger = logging.getLogger(__name__)
 logger.info("\n" * 3)
@@ -35,17 +31,11 @@ logger.info("=== Skript gestartet am %s ===", datetime.now().strftime("%Y-%m-%d 
 ExportEqualsImport = False
 ExportPath = ""
 
-# ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berlin GmbH\\Quadriga Sharepoint\\Teams\\Data Management\\MarketingServices\\10_Birger_Hildenbrandt\\0_POSTEINGANG\\01_PROJEKTE\\KLICKERTOOL"
 ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berlin GmbH\\General - Data Management\\30k_for_Quadriga"
-
-
 
 if ExportEqualsImport or not ExportPath:
     logger.info("Exportpfad gleich Importpfad weil keine Info oder vorgegeben.")
     ExportPath = ImportPath
-
-# Erstmal provisorisch die neu gestalteten ExcelKlassen integriert - es gibt noch keine expliziten Tests dafür.
-# Die Excelfunktionen haben auch noch keinen Logger.
 
 if ec.IndividualFolderExcel.is_readable_directory(ImportPath):
     DQFileFolder = ec.IndividualFolderExcel(ImportPath)
@@ -82,7 +72,7 @@ for quelldatei, _DataFrame in DataFrames.items():
 
     DQComparisonInstanzen.append(cc.Comparison(string_abgleichstyp, menge_abgleichsspalten, _DataFrame, quelldatei))
 
-
+#------------------------READING
 for DQComparisonInstanz in DQComparisonInstanzen:
     #logger.info("Beginne Bearbeitung für Instanz {}.".format(DQComparisonInstanz))
     
