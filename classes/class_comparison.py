@@ -3,6 +3,24 @@ import pytest
 import logging
 import re
 import pprint
+from collections import Counter
+
+
+def extract_trigrams_with_frequency(text):
+    """
+        Ermittle alle überlappenden Trigramme eines Strings und gib sie als
+        Menge von Tupeln im Format (trigramm, häufigkeit) zurück.
+    """
+    if not isinstance(text, str):
+        raise TypeError("text muss ein String sein")
+
+    if len(text) < 3:
+        return set()
+
+    trigrams = (text[index:index + 3] for index in range(len(text) - 2))
+    trigram_counter = Counter(trigrams)
+
+    return set(trigram_counter.items())
 
 
 class Comparison:
