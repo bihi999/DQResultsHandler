@@ -3,6 +3,8 @@ import pytest
 import pprint
 from pathlib import Path
 from datetime import datetime
+import pandas as pd
+import openpyxl
 
 
 from classes import class_comparison as cc
