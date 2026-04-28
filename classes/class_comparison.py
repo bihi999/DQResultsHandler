@@ -7,11 +7,38 @@ import pprint
 
 class Comparison:
     """
-        Factory-Klasse um die Datenaufbereitung aus einer Ergebnisliste der Dublettensuche der DQ-Apps
-        zu steuern und für die weitere Bearbeitung mit dem Klickertool (als GUI) aufzubereiten.
+        Steuert die Verarbeitung einer DQ-Ergebnisliste aus der Dublettensuche.
 
-        Args    default_column_names (set) - Spaltennamen die DQ einem Abgleich mitgibt und die nicht zu den abgeglichenen Daten gehören # Konstante
-                contact_fields (set) - Spaltennamen die inviduelle Daten darstellen und darum nicht in einem Firmenabgleich auftauchen dürfen
+        Die Klasse nimmt eine vollständige, valide DQ-Ergebnistabelle entgegen,
+        bereinigt sie für die weitere Verarbeitung und zerlegt sie anhand der
+        DQ-Gruppennummern in einzelne Dublettengruppen. Je nach erkanntem
+        Abgleichstyp werden daraus spezialisierte Gruppenobjekte erzeugt,
+        verarbeitet und anschließend wieder zu klickerfähigen Dublettengruppen
+        sowie auswertbaren Firmenrelationen zusammengeführt.
+
+        Args:
+            comparison_type (str): Erkannter Abgleichstyp, z. B.
+                "Firmenabgleich_name", "Firmenabgleich_domain",
+                "Firmenabgleich_domain_name" oder "Kontaktabgleich_name".
+            comparison_columns (set[str]): Spaltennamen, die im DQ-Abgleich
+                tatsächlich als Vergleichsdaten verwendet wurden.
+            comparison_data (pd.DataFrame): DQ-Ergebnistabelle mit allen Zeilen
+                und Metadaten der Dublettensuche.
+            sourcefile (str): Pfad oder Dateiname der Quelldatei, aus der die
+                Vergleichsdaten stammen.
+
+        Attributes:
+            default_column_names (set[str]): DQ-Metadatenspalten, die nicht zu
+                den fachlichen Vergleichsdaten gehören.
+            contact_fields (set[str]): Kontaktbezogene Spalten, die in einem
+                reinen Firmenabgleich nicht vorkommen dürfen.
+            comparison_count (int): Anzahl der erkannten Dublettengruppen.
+            doublet_groups (dict[int, object]): Nach DQ-Gruppennummer
+                gespeicherte, spezialisierte Dublettengruppen.
+            found_relations (pd.DataFrame): Zusammengeführte Firmenrelationen
+                aus den verarbeiteten Dublettengruppen.
+            reorganized_doublet_groups (pd.DataFrame): Neu aufgebaute
+                Dublettengruppen für die weitere Bearbeitung im Klickertool.
 
     """
     # Die Klasse sollte speichern, aus welchem Dokument ihre Daten kommen.
