@@ -179,6 +179,114 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
 
 
 
+def prepare_dataframes_new(dataframes: list[pd.DataFrame], logger, relation_class, strict: bool = True):
+    """
+    Prueft eine Liste von DataFrames gegen relation_class.REQUIRED_SCHEMA.
+    Die Funktion ist nicht an eine konkrete Klasse gebunden, erwartet aber:
+
+      relation_class.REQUIRED_SCHEMA = {
+          "Spaltenname": "string" | "Int64",
+          ...
+      }
+
+    Gibt die gueltigen und ggf. konvertierten DataFrames zurueck.
+    """
+    if not dataframes:
+        logger.error("Die uebergebene DataFrame-Liste ist leer.")
+        return []
+
+    schema = getattr(relation_class, "REQUIRED_SCHEMA", None)
+    class_name = getattr(relation_class, "__name__", repr(relation_class))
+
+    if not isinstance(schema, dict):
+        logger.error(
+            f"Klasse {class_name} stellt kein gueltiges REQUIRED_SCHEMA-Dict bereit."
+        )
+        return []
+
+    if not schema:
+        logger.error(f"Klasse {class_name} hat ein leeres REQUIRED_SCHEMA.")
+        return []
+
+    def _coerce_to_string(df: pd.DataFrame, col: str, logger) -> None:
+        df[col] = df[col].astype("string")
+
+    type_handlers = {
+        "string": (_is_series_string_like, _coerce_to_string),
+        "Int64": (_is_series_int_like, _coerce_to_int64_with_logging),
+    }
+
+    required_cols = list(schema.keys())
+    valid_dataframes = []
+
+    for idx, df in enumerate(dataframes, start=1):
+        logger.info(f"Pruefe DataFrame {idx} mit {len(df)} Zeilen gegen {class_name}.")
+
+        unsupported_types = {
+            col: expected
+            for col, expected in schema.items()
+            if expected not in type_handlers
+        }
+        if unsupported_types:
+            logger.error(
+                f"DataFrame {idx}: REQUIRED_SCHEMA von {class_name} enthaelt "
+                f"nicht unterstuetzte Typen: {unsupported_types}"
+            )
+            continue
+
+        missing = [c for c in required_cols if c not in df.columns]
+        extra = [c for c in df.columns if c not in required_cols]
+
+        if missing:
+            logger.error(f"DataFrame {idx} fehlt folgende Spalten: {missing}")
+            continue
+        if strict and extra:
+            logger.error(f"DataFrame {idx} enthaelt unerlaubte zusaetzliche Spalten: {extra}")
+            continue
+
+        dtype_errors = []
+        for col, expected in schema.items():
+            checker, converter = type_handlers[expected]
+            s = df[col]
+
+            if checker(s):
+                continue
+
+            logger.warning(
+                f"DataFrame {idx}, Spalte '{col}': falscher Typ {s.dtype}, "
+                f"versuche Umwandlung in {expected}..."
+            )
+            try:
+                converter(df, col, logger)
+            except Exception as e:
+                dtype_errors.append(
+                    f"Spalte '{col}' konnte nicht in {expected} konvertiert werden: {e}"
+                )
+                continue
+
+            if checker(df[col]):
+                logger.info(
+                    f"DataFrame {idx}, Spalte '{col}': erfolgreich in {expected} konvertiert."
+                )
+            else:
+                dtype_errors.append(
+                    f"Spalte '{col}' wurde konvertiert, passt aber weiterhin nicht zu {expected}."
+                )
+
+        if dtype_errors:
+            for msg in dtype_errors:
+                logger.error(f"DataFrame {idx}: {msg}")
+            continue
+
+        logger.info(
+            f"DataFrame {idx} hat gueltige Spalten & Typen fuer {class_name} (strict={strict})."
+        )
+        valid_dataframes.append(df)
+
+    logger.info(f"Insgesamt gueltige DataFrames fuer {class_name}: {len(valid_dataframes)}")
+    return valid_dataframes
+
+
 def create_instances(
     dataframes: Iterable[pd.DataFrame],
     logger,
