@@ -59,6 +59,44 @@ class relation_firma:
         return f"relation_firma({self.ApolloFirmenID}, {self.Firmenname}, {self.Ort})"
 
 
+class relation_firmen:
+    # Schema: Pflichtspalten + erwartete Dtypes (pandas)
+    REQUIRED_SCHEMA = {
+        "firmentupel_apollo": "string",
+        "WebFirmenID": "Int64",          # Integer
+        "Relation": "string",
+        "Relation_staerke": "Int64"      # Integer
+    }
+
+    __slots__ = tuple(REQUIRED_SCHEMA.keys())
+
+    def __init__(self, firmentupel_apollo, WebFirmenID, Relation, Relation_staerke):
+        self.firmentupel_apollo = firmentupel_apollo
+        self.WebFirmenID = WebFirmenID
+        self.Relation = Relation
+        self.Relation_staerke = Relation_staerke
+
+    def _key(self) -> Tuple:
+        # Die Reihenfolge der Felder definiert Identität
+        return (
+            self.firmentupel_apollo,
+            self.WebFirmenID,
+            self.Relation,
+            self.Relation_staerke,
+        )
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, relation_firmen):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
+
+    def __repr__(self):
+        return f"relation_firmen({self.firmentupel_apollo})"
+
+
 
 def _is_series_string_like(s: pd.Series) -> bool:
     """Erlaubt pandas 'string' oder 'object' (wenn alle Nicht-NA Werte echte str sind)."""
