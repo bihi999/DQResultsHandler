@@ -179,7 +179,13 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
 
 
 
-def prepare_dataframes_new(dataframes: list[pd.DataFrame], logger, relation_class, strict: bool = True):
+def prepare_dataframes_new(
+    dataframes: list[pd.DataFrame],
+    logger,
+    relation_class,
+    strict: bool = True,
+    deduplicate: bool = True
+):
     """
     Prueft eine Liste von DataFrames gegen relation_class.REQUIRED_SCHEMA.
     Die Funktion ist nicht an eine konkrete Klasse gebunden, erwartet aber:
@@ -189,7 +195,8 @@ def prepare_dataframes_new(dataframes: list[pd.DataFrame], logger, relation_clas
           ...
       }
 
-    Gibt die gueltigen und ggf. konvertierten DataFrames zurueck.
+    Gibt Instanzen von relation_class zurueck.
+    - deduplicate=True: entfernt identische Instanzen ueber Mengenlogik (__eq__/__hash__).
     """
     if not dataframes:
         logger.error("Die uebergebene DataFrame-Liste ist leer.")
@@ -217,10 +224,13 @@ def prepare_dataframes_new(dataframes: list[pd.DataFrame], logger, relation_clas
     }
 
     required_cols = list(schema.keys())
-    valid_dataframes = []
+    total_rows = 0
+    raw_instances = []
 
     for idx, df in enumerate(dataframes, start=1):
-        logger.info(f"Pruefe DataFrame {idx} mit {len(df)} Zeilen gegen {class_name}.")
+        n = len(df)
+        total_rows += n
+        logger.info(f"Pruefe DataFrame {idx} mit {n} Zeilen gegen {class_name}.")
 
         unsupported_types = {
             col: expected
@@ -281,10 +291,50 @@ def prepare_dataframes_new(dataframes: list[pd.DataFrame], logger, relation_clas
         logger.info(
             f"DataFrame {idx} hat gueltige Spalten & Typen fuer {class_name} (strict={strict})."
         )
-        valid_dataframes.append(df)
 
-    logger.info(f"Insgesamt gueltige DataFrames fuer {class_name}: {len(valid_dataframes)}")
-    return valid_dataframes
+        created_for_df = 0
+        for row_idx, row in df.iterrows():
+            try:
+                values = {col: row[col] for col in required_cols}
+                inst = relation_class(**values)
+                raw_instances.append(inst)
+                created_for_df += 1
+            except KeyError as e:
+                logger.error(
+                    f"Fehlende Spalte bei Instanz-Erstellung in DataFrame {idx}, "
+                    f"Zeile {row_idx}: {e}"
+                )
+            except TypeError as e:
+                logger.error(
+                    f"Signatur von {class_name} passt nicht zu REQUIRED_SCHEMA "
+                    f"in DataFrame {idx}, Zeile {row_idx}: {e}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Allg. Fehler bei Instanz-Erstellung in DataFrame {idx}, "
+                    f"Zeile {row_idx}: {e}"
+                )
+
+        logger.info(
+            f"DataFrame {idx}: {created_for_df} Instanzen von {class_name} erzeugt."
+        )
+
+    logger.info(
+        f"Roh erzeugte Instanzen von {class_name}: {len(raw_instances)} "
+        f"(aus {total_rows} Zeilen)"
+    )
+
+    if not deduplicate:
+        return raw_instances
+
+    unique_set = set(raw_instances)
+    deduped = list(unique_set)
+    removed = len(raw_instances) - len(deduped)
+    logger.info(
+        f"Deduplizierung fuer {class_name}: {removed} Duplikate entfernt, "
+        f"{len(deduped)} eindeutige Instanzen verbleiben."
+    )
+    return deduped
 
 
 def create_instances(
