@@ -9,7 +9,7 @@ import openpyxl
 
 from classes import class_comparison as cc
 from classes import class_relation as cr
-from classes import abandoned_classes     #Reminder: Wurden für Comparison erstellt - aber nie genutzt 
+from classes.abandoned_classes import ComparisonCompany_ID_wise
 
 from excel_functions import excel_classes as ec
 
@@ -33,7 +33,8 @@ logger.info("=== Skript gestartet am %s ===", datetime.now().strftime("%Y-%m-%d 
 ExportEqualsImport = False
 ExportPath = ""
 
-ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berlin GmbH\\General - Data Management\\30k_for_Quadriga"
+# ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berlin GmbH\\General - Data Management\\30k_for_Quadriga"
+ImportPath = "C:\\Users\\BirgerHildenbrandt\\OneDrive - Quadriga Hochschule Berlin GmbH\\Desktop\\abgleich_temp"
 
 if ExportEqualsImport or not ExportPath:
     logger.info("Exportpfad gleich Importpfad weil keine Info oder vorgegeben.")
@@ -66,6 +67,8 @@ for quelldatei, _DataFrame in DataFrames.items():
     menge_abgleichsspalten = set()
     menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame.columns, cc.Comparison.default_column_names, logger)
     
+    print(menge_abgleichsspalten)
+
     if menge_abgleichsspalten:
         string_abgleichstyp = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, cc.Comparison.contact_fields, logger)
     else:
@@ -96,6 +99,11 @@ found_relations_valid =cr.prepare_dataframes(found_relations, logger)
 relations_firma = cr.create_instances(found_relations_valid, logger)
 export_dict = cr.reorganize_instances(relations_firma, logger)
 relations_dataframe = cr.build_relation_dataframe(export_dict, logger)
+
+relations_dataframe.head()
+
 export_dataframe_to_excel(relations_dataframe, ImportPath, "unknown.xlsx", logger, "_relations")
 
-pprint.pprint(export_dict)
+
+
+#pprint.pprint(export_dict)

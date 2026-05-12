@@ -3,44 +3,33 @@ import pytest
 import logging
 import re
 import pprint
+from .abandoned_classes import ComparisonCompany_ID_wise
 
 
 class Comparison:
     """
         Steuert die Verarbeitung einer DQ-Ergebnisliste aus der Dublettensuche.
 
-        Die Klasse nimmt eine vollständige, valide DQ-Ergebnistabelle entgegen,
-        bereinigt sie für die weitere Verarbeitung und zerlegt sie anhand der
-        DQ-Gruppennummern in einzelne Dublettengruppen. Je nach erkanntem
-        Abgleichstyp werden daraus spezialisierte Gruppenobjekte erzeugt,
-        verarbeitet und anschließend wieder zu klickerfähigen Dublettengruppen
-        sowie auswertbaren Firmenrelationen zusammengeführt.
+        Die Klasse nimmt eine vollständige, valide DQ-Ergebnistabelle entgegen, bereinigt sie für die weitere Verarbeitung und zerlegt sie anhand der
+        DQ-Gruppennummern in einzelne Dublettengruppen. Je nach erkanntem Abgleichstyp werden daraus spezialisierte Gruppenobjekte erzeugt,
+        verarbeitet und anschließend wieder zu klickerfähigen Dublettengruppen sowie auswertbaren Firmenrelationen zusammengeführt.
 
         Args:
-            comparison_type (str): Erkannter Abgleichstyp, z. B.
-                "Firmenabgleich_name", "Firmenabgleich_domain",
-                "Firmenabgleich_domain_name" oder "Kontaktabgleich_name".
-            comparison_columns (set[str]): Spaltennamen, die im DQ-Abgleich
-                tatsächlich als Vergleichsdaten verwendet wurden.
-            comparison_data (pd.DataFrame): DQ-Ergebnistabelle mit allen Zeilen
-                und Metadaten der Dublettensuche.
-            sourcefile (str): Pfad oder Dateiname der Quelldatei, aus der die
-                Vergleichsdaten stammen.
+            comparison_type (str): Erkannter Abgleichstyp, z. B. "Firmenabgleich_name", "Firmenabgleich_domain" usw.
+            comparison_columns (set[str]): Spaltennamen, die im DQ-Abgleich tatsächlich als Vergleichsdaten verwendet wurden.
+            comparison_data (pd.DataFrame): DQ-Ergebnistabelle mit allen Zeilen und Metadaten der Dublettensuche.
+            sourcefile (str): Pfad oder Dateiname der Quelldatei, aus der die Vergleichsdaten stammen.
 
         Attributes:
-            default_column_names (set[str]): DQ-Metadatenspalten, die nicht zu
-                den fachlichen Vergleichsdaten gehören.
-            contact_fields (set[str]): Kontaktbezogene Spalten, die in einem
-                reinen Firmenabgleich nicht vorkommen dürfen.
-            comparison_count (int): Anzahl der erkannten Dublettengruppen.
-            doublet_groups (dict[int, object]): Nach DQ-Gruppennummer
-                gespeicherte, spezialisierte Dublettengruppen.
-            found_relations (pd.DataFrame): Zusammengeführte Firmenrelationen
-                aus den verarbeiteten Dublettengruppen.
-            reorganized_doublet_groups (pd.DataFrame): Neu aufgebaute
-                Dublettengruppen für die weitere Bearbeitung im Klickertool.
+            default_column_names (set[str]): DQ-Metadatenspalten, die nicht zu den fachlichen Vergleichsdaten gehören.
+            contact_fields (set[str]): Kontaktbezogene Spalten, die in einem Firmenabgleich nicht vorkommen dürfen.
+            comparison_count (int): Anzahl der erkannten Dublettengruppen. 
+            doublet_groups (dict[int, object]): Nach DQ-Gruppennummer gespeicherte, spezialisierte Dublettengruppen.
+            found_relations (pd.DataFrame): Zusammengeführte Firmenrelationen aus den verarbeiteten Dublettengruppen.
+            reorganized_doublet_groups (pd.DataFrame): Neu aufgebaute Dublettengruppen für die weitere Bearbeitung im Klickertool.
 
     """
+    
     # Die Klasse sollte speichern, aus welchem Dokument ihre Daten kommen.
 
     # Als FACTORY-KLASSE erhält Comparison ALLE Daten die valide DQ-Daten sind - was dann später damit möglich ist
@@ -117,17 +106,29 @@ class Comparison:
               comparison_column_names.isdisjoint(contact_fields)):
             detect_comparison_type_return_string = "Firmenabgleich_domain"
             logger.info("abgleichstyp: Firmenabgleich_domain")
+
+        elif (comparison_column_names.isdisjoint(contact_fields)  
+            and comparison_column_names == {"Firmenname", "Bundesland\\Kanton"}):
+            detect_comparison_type_return_string = "Firmenabgleich_name"
+            logger.info("abgleichstyp: Firmenabgleich_name_bundesland")
         
         elif (comparison_column_names.isdisjoint(contact_fields) and
               comparison_column_names == {"Firmenname", "domain"}):
              detect_comparison_type_return_string = "Firmenabgleich_domain_name"
              logger.info("abgleichstyp: Firmenabgleich_domain_name")
+
+        elif (comparison_column_names.isdisjoint(contact_fields) and
+              comparison_column_names == {"Bundesland\\Kanton", "domain"}):
+             detect_comparison_type_return_string = "Firmenabgleich_domain_name"
+             logger.info("abgleichstyp: Firmenabgleich_domain_bundesland")
+        
         
         else:
             detect_comparison_type_return_string = "Unbekannt"
             logger.info("Ableichsspalten {} lassen sich keinem abgleichstyp zuordnen".format(("-").join(comparison_column_names)))
 
 
+        print(("-").join(comparison_column_names))
         
         return detect_comparison_type_return_string
 

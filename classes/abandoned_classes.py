@@ -1,3 +1,6 @@
+import pandas as pd
+import re
+
 class ComparisonCompany_ID_wise:
     """
         Klasse zum Handling von Firmenabgleich_name, Firmenabgleich_domain und Firmenabgleich_domain_name - wenn IDs und Ortsangaben vorhanden sind.

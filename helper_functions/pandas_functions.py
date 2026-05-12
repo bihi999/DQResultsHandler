@@ -28,4 +28,6 @@ def export_dataframe_to_excel(df: pd.DataFrame, pfad: str, dateiname: str, logge
     # Export ohne Index
     df.to_excel(fullpath, index=False, engine="openpyxl")
     
+    logger.info("pandas_functions.export_dataframe_to_excel: {} Zeilen aus Data Frame geschrieben in den Pfad {}.".format(len(df), fullpath))
+
     return 
