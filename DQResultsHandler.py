@@ -94,13 +94,12 @@ for DQComparisonInstanz in DQComparisonInstanzen:
     # export_dataframe_to_excel(DQComparisonInstanz.reorganized_doublet_groups, ImportPath, DQComparisonInstanz.sourcefile, logger, "_dublettengruppen")
     found_relations.append(DQComparisonInstanz.found_relations)    
 
-print(len(found_relations))
-found_relations_valid =cr.prepare_dataframes(found_relations, logger)
+
+
+found_relations_valid = cr.prepare_dataframes(found_relations, logger)
 relations_firma = cr.create_instances(found_relations_valid, logger)
 export_dict = cr.reorganize_instances(relations_firma, logger)
 relations_dataframe = cr.build_relation_dataframe(export_dict, logger)
-
-relations_dataframe.head()
 
 export_dataframe_to_excel(relations_dataframe, ImportPath, "unknown.xlsx", logger, "_relations")
 

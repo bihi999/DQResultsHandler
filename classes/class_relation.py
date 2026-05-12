@@ -3,21 +3,30 @@ import numpy as np
 from typing import Iterable, List, Set, Tuple, Dict, Set, Optional
 from pandas.api.types import (is_string_dtype, is_object_dtype, is_integer_dtype)
 
-# Schema: Pflichtspalten + erwartete Dtypes (pandas)
-REQUIRED_SCHEMA = {
-    "ApolloFirmenID": "string",
-    "Firmenname": "string",
-    "Ort": "string",
-    "WebFirmenID": "Int64",          # Integer
-    "Relation": "string",
-    "Relation_staerke": "Int64"      # Integer
-}
+# Warum ist so immens viel an Datenaufbereitung und -Prüfung in diesem Modul ?
+
+# h_ Apollo-Firma ist nicht hinreichend beschrieben durch dieses Schema - Ort ist mehrdeutig - wie benötigen den Tupel-Hash
+# ggfs. muss die Firma überhaupt erst noch gehasht werden
+
+# h_ required_schema ist auch falsch platziert - es beschreibt lediglich das Schema für die Firmen
+
+# h_ Die relation_firma ist verwirrend konzipiert weil ihre uniqueness als Firma konzipiert ist und nicht als relation
+
+
+
 
 class relation_firma:
-    __slots__ = (
-        "ApolloFirmenID", "Firmenname", "Ort",
-        "WebFirmenID", "Relation", "Relation_staerke"
-    )
+    # Schema: Pflichtspalten + erwartete Dtypes (pandas)
+    REQUIRED_SCHEMA = {
+        "ApolloFirmenID": "string",
+        "Firmenname": "string",
+        "Ort": "string",
+        "WebFirmenID": "Int64",          # Integer
+        "Relation": "string",
+        "Relation_staerke": "Int64"      # Integer
+    }
+
+    __slots__ = tuple(REQUIRED_SCHEMA.keys())
 
     def __init__(self, ApolloFirmenID, Firmenname, Ort, WebFirmenID, Relation, Relation_staerke):
         self.ApolloFirmenID = ApolloFirmenID
@@ -49,6 +58,8 @@ class relation_firma:
     def __repr__(self):
         return f"relation_firma({self.ApolloFirmenID}, {self.Firmenname}, {self.Ort})"
 
+
+
 def _is_series_string_like(s: pd.Series) -> bool:
     """Erlaubt pandas 'string' oder 'object' (wenn alle Nicht-NA Werte echte str sind)."""
     if is_string_dtype(s.dtype):
@@ -72,7 +83,7 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
     """
     Prüft eine Liste von DataFrames auf:
       - Pflichtspalten (und bei strict=True: keine zusätzlichen Spalten)
-      - erwartete Datentypen pro Pflichtspalte (siehe REQUIRED_SCHEMA)
+      - erwartete Datentypen pro Pflichtspalte (siehe relation_firma.REQUIRED_SCHEMA)
       - versucht automatische Konvertierung, falls der Typ nicht passt
     Gibt die (noch unbearbeiteten) DataFrames zurück, falls gültig.
     """
@@ -80,7 +91,7 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
         logger.error("Die übergebene DataFrame-Liste ist leer.")
         return []
 
-    required_cols = list(REQUIRED_SCHEMA.keys())
+    required_cols = list(relation_firma.REQUIRED_SCHEMA.keys())
     valid_dataframes = []
 
     for idx, df in enumerate(dataframes, start=1):
@@ -99,7 +110,7 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
 
         # Datentyp-Check + Konvertierung
         dtype_errors = []
-        for col, expected in REQUIRED_SCHEMA.items():
+        for col, expected in relation_firma.REQUIRED_SCHEMA.items():
             s = df[col]
             is_ok = False
 
@@ -127,6 +138,8 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
 
     logger.info(f"Insgesamt gültige DataFrames: {len(valid_dataframes)}")
     return valid_dataframes
+
+
 
 def create_instances(
     dataframes: Iterable[pd.DataFrame],
@@ -265,6 +278,8 @@ def reorganize_instances(
 def split_composite_key(key: Tuple[str, str, str]) -> Tuple[str, str, str]:
     """Gibt (ApolloFirmenID, Ort, Firmenname) zurück."""
     return key
+
+
 
 def _coerce_to_int64_with_logging(df: pd.DataFrame, col: str, logger) -> None:
     """
