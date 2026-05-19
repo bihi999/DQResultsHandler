@@ -16,6 +16,14 @@ class ComparisonType(Enum):
     KONTAKTABGLEICH = "kontaktabgleich"
 
 
+class ComparisonColumnSet(Enum):
+    """
+        Definition der festen Spaltengruppen, die zur Erkennung von Abgleichen benoetigt werden.
+    """
+    DEFAULT_COLUMN_NAMES = frozenset(["Nr.", "löschen", "%", "UnvollständigerDatensatz", "Tabelle"])
+    CONTACT_FIELDS = frozenset(["Vorname", "Nachname", "Funktion_Freifeld", "Position", "E-Mail", "Position / Funktion_Freifeld"])
+
+
 class Comparison:
     """
         Steuert die Verarbeitung einer DQ-Ergebnisliste aus der Dublettensuche.
@@ -31,8 +39,6 @@ class Comparison:
             sourcefile (str): Pfad oder Dateiname der Quelldatei, aus der die Vergleichsdaten stammen.
 
         Attributes:
-            default_column_names (set[str]): DQ-Metadatenspalten, die nicht zu den fachlichen Vergleichsdaten gehören.
-            contact_fields (set[str]): Kontaktbezogene Spalten, die in einem Firmenabgleich nicht vorkommen dürfen.
             comparison_count (int): Anzahl der erkannten Dublettengruppen. 
             doublet_groups (dict[int, object]): Nach DQ-Gruppennummer gespeicherte, spezialisierte Dublettengruppen.
             found_relations (pd.DataFrame): Zusammengeführte Firmenrelationen aus den verarbeiteten Dublettengruppen.
@@ -62,24 +68,28 @@ class Comparison:
         self._comparison_type = comparison_type
         
         
-    default_column_names = set(["Nr.", "löschen", "%", "UnvollständigerDatensatz", "Tabelle"])
-    contact_fields = {"Vorname", "Nachname", "Funktion_Freifeld", "Position", "E-Mail", "Position / Funktion_Freifeld"}
     
     @staticmethod
-    def extract_comparison_columns(menge_aller_spaltennamen, menge_DQ_spaltennamen, logger):    
+    def extract_comparison_columns(menge_aller_spaltennamen, logger=None):    
         
         """
             Excel-Tabellen von DQ enthalten standardmäßig einige Spalten die DQ erstellt.
             Davon wird das Vorhandensein von "Nr." bereits vorab geprüft - sonst keine Gruppenbildung möglich.
             Aus den sonstigen Spalten sind die ohne Sternchen im Abgleich enthalten, alle anderen nicht.
         """
-        
+        menge_DQ_spaltennamen = ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value
         
         if isinstance(menge_aller_spaltennamen, pd.Index):
-            logger.info("df.Index-Objekt erhalten. Umwandlung in Menge.")
+            if logger:
+                logger.info("df.Index-Objekt erhalten. Umwandlung in Menge.")
+            menge_aller_spaltennamen = set(menge_aller_spaltennamen)
+        elif isinstance(menge_aller_spaltennamen, (set, list, tuple, frozenset)):
+            if logger:
+                logger.info("Spaltennamen als iterierbare Sammlung erhalten. Umwandlung in Menge.")
             menge_aller_spaltennamen = set(menge_aller_spaltennamen)
         else:
-            logger.info("Kein df.Index-Objekt erhalten. Spaltennamen lassen sich nicht ermitteln.")
+            if logger:
+                logger.info("Kein df.Index-Objekt erhalten. Spaltennamen lassen sich nicht ermitteln.")
             return # Definierte Fehlermeldung nachtragen
         
         comparison_columns_df = set()
@@ -88,57 +98,65 @@ class Comparison:
             if column_name not in menge_DQ_spaltennamen and "*" not in column_name:
                 comparison_columns_df.add(column_name)
         
-        logger.info(f"{len(comparison_columns_df)} Spalten im Abgleich verwendet: {' - '.join(comparison_columns_df)}")
+        if logger:
+            logger.info(f"{len(comparison_columns_df)} Spalten im Abgleich verwendet: {' - '.join(comparison_columns_df)}")
 
         return comparison_columns_df
     
     
     
     @staticmethod
-    def detect_comparison_type(comparison_column_names, contact_fields, logger):
+    def detect_comparison_type(comparison_column_names, logger=None):
         
         """
             Anhand der Spaltennamen die im Abgleich enthalten sind, wird die Art des Abgleichs ermittelt.
         """
-        
+        contact_fields = ComparisonColumnSet.CONTACT_FIELDS.value
         
         detect_comparison_type_return_string = ""
 
         # Vorname und Nachname ist immer Abgleich auf Kontakte
         if {"Vorname", "Nachname"}.issubset(comparison_column_names):
             detect_comparison_type_return_string = "Kontaktabgleich_name"
-            logger.info("abgleichstyp: Kontaktabgleich_name")
+            if logger:
+                logger.info("abgleichstyp: Kontaktabgleich_name")
         
         # Nur Firmenname und keine individuellen Suchfelder ist immer Abgleich auf Firmen(name)
         elif (comparison_column_names.isdisjoint(contact_fields)  
             and comparison_column_names == {"Firmenname"})            :
             detect_comparison_type_return_string = "Firmenabgleich_name"
-            logger.info("abgleichstyp: Firmenabgleich_name")
+            if logger:
+                logger.info("abgleichstyp: Firmenabgleich_name")
         
         elif (comparison_column_names == {"domain"} and
               comparison_column_names.isdisjoint(contact_fields)):
             detect_comparison_type_return_string = "Firmenabgleich_domain"
-            logger.info("abgleichstyp: Firmenabgleich_domain")
+            if logger:
+                logger.info("abgleichstyp: Firmenabgleich_domain")
 
         elif (comparison_column_names.isdisjoint(contact_fields)  
             and comparison_column_names == {"Firmenname", "Bundesland\\Kanton"}):
             detect_comparison_type_return_string = "Firmenabgleich_name"
-            logger.info("abgleichstyp: Firmenabgleich_name_bundesland")
+            if logger:
+                logger.info("abgleichstyp: Firmenabgleich_name_bundesland")
         
         elif (comparison_column_names.isdisjoint(contact_fields) and
               comparison_column_names == {"Firmenname", "domain"}):
              detect_comparison_type_return_string = "Firmenabgleich_domain_name"
-             logger.info("abgleichstyp: Firmenabgleich_domain_name")
+             if logger:
+                 logger.info("abgleichstyp: Firmenabgleich_domain_name")
 
         elif (comparison_column_names.isdisjoint(contact_fields) and
               comparison_column_names == {"Bundesland\\Kanton", "domain"}):
              detect_comparison_type_return_string = "Firmenabgleich_domain_name"
-             logger.info("abgleichstyp: Firmenabgleich_domain_bundesland")
+             if logger:
+                 logger.info("abgleichstyp: Firmenabgleich_domain_bundesland")
         
         
         else:
             detect_comparison_type_return_string = "Unbekannt"
-            logger.info("Ableichsspalten {} lassen sich keinem abgleichstyp zuordnen".format(("-").join(comparison_column_names)))
+            if logger:
+                logger.info("Ableichsspalten {} lassen sich keinem abgleichstyp zuordnen".format(("-").join(comparison_column_names)))
 
 
         print(("-").join(comparison_column_names))

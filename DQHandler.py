@@ -71,11 +71,11 @@ if DQFileFolder.excel_file_list:
 for quelldatei, _DataFrame in DataFrames.items():
     
     menge_abgleichsspalten = set()
-    menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame.columns, cc.Comparison.default_column_names, logger)
+    menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame.columns, logger)
     
     
     if menge_abgleichsspalten:
-        string_abgleichstyp = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, cc.Comparison.contact_fields, logger)
+        string_abgleichstyp = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, logger)
     else:
         logger.info("Es wurden keine Abgleichsspalten ermittelt - keine Auswertung möglich.")
         continue

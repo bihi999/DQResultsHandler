@@ -8,6 +8,6 @@ import pytest
 
 @pytest.mark.parametrize("Abgleichstyp, Spaltennamen", ColumnNamesComparisonTypes.TestCases)
 def test_determine_comparison_type(Abgleichstyp, Spaltennamen):
-    assert cc.detect_comparison_type(Spaltennamen, cc.contact_fields) == Abgleichstyp
+    assert cc.detect_comparison_type(Spaltennamen) == Abgleichstyp
 
 

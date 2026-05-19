@@ -25,7 +25,7 @@ for key, value in testtabellen.items():
     
 @pytest.mark.parametrize("urdaten,abgleichstyp", [(case["dataframe"], case["comparison_type"]) for case in testdaten.values()], ids=list(testdaten.keys()),)
 def test_datentyp_rueckgabe(urdaten, abgleichstyp):
-    assert isinstance(cc.extract_comparison_columns(urdaten.columns, cc.default_column_names), set)
+    assert isinstance(cc.extract_comparison_columns(urdaten.columns), set)
 
 # Wieviele Tests lassen sich hier einreihen
 
