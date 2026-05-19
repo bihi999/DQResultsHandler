@@ -48,8 +48,6 @@ if ec.IndividualFolderExcel.is_readable_directory(ImportPath):
     DQFileFolder.extract_filenames()
     DQFileFolder.get_excel_files()
     DQFileFolder.extract_filenames(True)
-    DQFileFolder.filter_excel_files_by_columns(["Nr."], False)
-    DQFileFolder.extract_filenames(True)
 else:
     logger.info("Verzeichnis kann nicht instanziiert werden.")
 
@@ -65,9 +63,13 @@ if DQFileFolder.excel_file_list:
 # Mindestanforderungen an die Excel - Dateien sind vorher zu prüfen: Nur soweit sie überhaupt erst als DQ-Dateien erkennbar sein müssen
 # Mengenlogik für die Spaltennamen usw. liegt aber dann alles in class_comparison\comparison als Factory - Klasse
 for quelldatei, _DataFrame in DataFrames.items():
+    _DataFrame = cc.Comparison.prepare_raw_dataframe(_DataFrame, logger)
+    if _DataFrame is None:
+        logger.error("Comparison-Instanziierung fuer %s abgebrochen: Urdatenframe konnte nicht vorbereitet werden.", quelldatei)
+        continue
     
     menge_abgleichsspalten = set()
-    menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame.columns, logger)
+    menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame, logger)
     
     print(menge_abgleichsspalten)
 
@@ -86,9 +88,7 @@ stammdaten = combine_stammdaten_from_comparisons(DQComparisonInstanzen, logger)
 
 for DQComparisonInstanz in DQComparisonInstanzen:
     #logger.info("Beginne Bearbeitung für Instanz {}.".format(DQComparisonInstanz))
-    
-    DQComparisonInstanz.run_data_cleaning(logger)
-    
+
     #print(DQComparisonInstanz.comparison_data.head())
 
     DQComparisonInstanz.detect_doublet_groups(logger)

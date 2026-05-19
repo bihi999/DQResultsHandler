@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from pathlib import Path
 
-from classes.class_comparison import Comparison as cc, ComparisonType
+from classes.class_comparison import Comparison as cc, ComparisonColumnSet, ComparisonType
 
 
 testdaten = {}
@@ -33,6 +33,55 @@ def test_datentyp_rueckgabe(urdaten, abgleichstyp):
 # test 3: ....
 
 
+def _prepare_for_comparison(dataframe):
+    for column_name in ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value:
+        if column_name not in dataframe.columns:
+            dataframe[column_name] = "x"
+    return cc.prepare_raw_dataframe(dataframe)
+
+
+def test_prepare_raw_dataframe_normalizes_missing_values_and_types():
+    dataframe = pd.DataFrame(
+        {
+            "Nr.": [1.0, 2.0],
+            "löschen": ["---", ""],
+            "%": ["90%", "---"],
+            "UnvollständigerDatensatz": ["", "nein"],
+            "Tabelle": ["Lead", "Firma"],
+            "*WebFirmenID*": [123.0, "---"],
+            "Firmenname": ["A GmbH", None],
+        }
+    )
+
+    prepared_dataframe = cc.prepare_raw_dataframe(dataframe)
+
+    assert prepared_dataframe is not None
+    assert "WebFirmenID" in prepared_dataframe.columns
+    assert str(prepared_dataframe["Nr."].dtype) == "Int64"
+    assert str(prepared_dataframe["WebFirmenID"].dtype) == "Int64"
+    assert str(prepared_dataframe["Firmenname"].dtype) == "string"
+    assert pd.isna(prepared_dataframe.loc[1, "WebFirmenID"])
+    assert pd.isna(prepared_dataframe.loc[0, "löschen"])
+
+
+def test_extract_comparison_columns_ignores_prepared_stammdaten_columns():
+    dataframe = pd.DataFrame(
+        {
+            "Nr.": [1],
+            "löschen": [""],
+            "%": ["90%"],
+            "UnvollständigerDatensatz": [""],
+            "Tabelle": ["Firma"],
+            "Firmenname": ["A GmbH"],
+            "*WebFirmenID*": [123],
+        }
+    )
+
+    prepared_dataframe = cc.prepare_raw_dataframe(dataframe)
+
+    assert cc.extract_comparison_columns(prepared_dataframe) == {"Firmenname"}
+
+
 def test_comparison_extracts_stammdaten_and_normalizes_column_names_on_init():
     dataframe = pd.DataFrame(
         {
@@ -43,15 +92,16 @@ def test_comparison_extracts_stammdaten_and_normalizes_column_names_on_init():
         }
     )
 
+    prepared_dataframe = _prepare_for_comparison(dataframe)
     instance = cc(
         ComparisonType.FIRMENABGLEICH,
         {"Firmenname"},
-        dataframe,
+        prepared_dataframe,
         "test.xlsx",
     )
 
     assert instance.stammdaten_spalten == {"WebFirmenID", "(Nicht aendern) Firma"}
-    assert set(instance.comparison_data.columns) == {"Nr.", "Firmenname", "WebFirmenID", "(Nicht aendern) Firma"}
+    assert {"Nr.", "Firmenname", "WebFirmenID", "(Nicht aendern) Firma"}.issubset(instance.comparison_data.columns)
 
 
 def test_comparison_evaluates_stammdaten_dataframes_on_init():
@@ -65,10 +115,11 @@ def test_comparison_evaluates_stammdaten_dataframes_on_init():
         }
     )
 
+    prepared_dataframe = _prepare_for_comparison(dataframe)
     instance = cc(
         ComparisonType.FIRMENABGLEICH,
         {"Firmenname"},
-        dataframe,
+        prepared_dataframe,
         "test.xlsx",
     )
 

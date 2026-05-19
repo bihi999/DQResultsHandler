@@ -23,6 +23,7 @@ class ComparisonColumnSet(Enum):
     """
     DEFAULT_COLUMN_NAMES = frozenset(["Nr.", "löschen", "%", "UnvollständigerDatensatz", "Tabelle"])
     CONTACT_FIELDS = frozenset(["Vorname", "Nachname", "Funktion_Freifeld", "Position", "E-Mail", "Position / Funktion_Freifeld"])
+    INTEGER_COLUMN_NAMES = frozenset(["Nr.", "ApolloKontaktID", "WebFirmenID", "WebID"])
 
 
 class ComparisonTypeDetectionError(Exception):
@@ -92,8 +93,7 @@ class Comparison:
         self.comparison_type = comparison_type
         self.comparison_columns = comparison_columns
         self.comparison_data = comparison_data
-        self.stammdaten_spalten = set()
-        self.extract_stammdaten_and_normalize_column_names()
+        self.stammdaten_spalten = set(comparison_data.attrs.get("stammdaten_spalten", set()))
         self.stammdaten = evaluate_stammdaten_dataframes(self.comparison_data, self.comparison_columns)
         self.sourcefile = sourcefile
         self.comparison_count = 0
@@ -124,8 +124,14 @@ class Comparison:
             Aus den sonstigen Spalten sind die ohne Sternchen im Abgleich enthalten, alle anderen nicht.
         """
         menge_DQ_spaltennamen = ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value
+        stammdaten_spalten = set()
         
-        if isinstance(menge_aller_spaltennamen, pd.Index):
+        if isinstance(menge_aller_spaltennamen, pd.DataFrame):
+            if logger:
+                logger.info("DataFrame erhalten. Spaltennamen und Stammdaten-Attribute werden ausgewertet.")
+            stammdaten_spalten = set(menge_aller_spaltennamen.attrs.get("stammdaten_spalten", set()))
+            menge_aller_spaltennamen = set(menge_aller_spaltennamen.columns)
+        elif isinstance(menge_aller_spaltennamen, pd.Index):
             if logger:
                 logger.info("df.Index-Objekt erhalten. Umwandlung in Menge.")
             menge_aller_spaltennamen = set(menge_aller_spaltennamen)
@@ -141,7 +147,7 @@ class Comparison:
         comparison_columns_df = set()
 
         for column_name in menge_aller_spaltennamen:
-            if column_name not in menge_DQ_spaltennamen and "*" not in column_name:
+            if column_name not in menge_DQ_spaltennamen and column_name not in stammdaten_spalten and "*" not in column_name:
                 comparison_columns_df.add(column_name)
         
         if logger:
@@ -227,26 +233,95 @@ class Comparison:
 
     
     
-    # Data Frame zunächst zentral aufbereiten.
-
-    ORDER_CLEAN_DATA = ["remove_nan_mask", "normalize_column_names", "turn_apolloid_to_apollofirmenid"]
-
     @staticmethod
     def _remove_column_name_stars(column_name):
         if isinstance(column_name, str):
             return column_name.replace("*", "")
         return column_name
 
-    def extract_stammdaten_and_normalize_column_names(self):
-        normalized_column_names = []
+    @staticmethod
+    def prepare_raw_dataframe(dataframe, logger=None):
+        """
+            Bereitet einen DQ-Urdatenframe vor der Comparison-Instanziierung einheitlich auf.
 
-        for column_name in self.comparison_data.columns:
-            normalized_column_name = self._remove_column_name_stars(column_name)
+            Rueckgabe:
+              - vorbereitete DataFrame-Kopie bei Erfolg
+              - None bei Validierungs-/Konvertierungsfehlern
+        """
+        if logger is None:
+            logger = logging.getLogger(__name__)
+
+        if not isinstance(dataframe, pd.DataFrame):
+            logger.error("Urdaten sind kein pandas DataFrame.")
+            return None
+
+        prepared_dataframe = dataframe.copy()
+        normalized_column_names = []
+        stammdaten_spalten = set()
+
+        for column_name in prepared_dataframe.columns:
+            normalized_column_name = Comparison._remove_column_name_stars(column_name)
             if isinstance(column_name, str) and "*" in column_name:
-                self.stammdaten_spalten.add(normalized_column_name)
+                stammdaten_spalten.add(normalized_column_name)
             normalized_column_names.append(normalized_column_name)
 
-        self.comparison_data.columns = normalized_column_names
+        duplicate_columns = pd.Index(normalized_column_names)
+        duplicate_columns = duplicate_columns[duplicate_columns.duplicated()].unique().tolist()
+        if duplicate_columns:
+            logger.error("Spaltennamen sind nach Normalisierung nicht eindeutig: %s", duplicate_columns)
+            return None
+
+        prepared_dataframe.columns = normalized_column_names
+
+        required_columns = ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value
+        missing_columns = sorted(required_columns - set(prepared_dataframe.columns))
+        if missing_columns:
+            logger.error("Urdatenframe enthaelt nicht alle Pflichtspalten: %s", missing_columns)
+            return None
+
+        prepared_dataframe = prepared_dataframe.replace(["---", ""], pd.NA)
+        prepared_dataframe = prepared_dataframe.replace(r"^\s*$", pd.NA, regex=True)
+
+        integer_columns = ComparisonColumnSet.INTEGER_COLUMN_NAMES.value
+        for column_name in prepared_dataframe.columns:
+            if column_name in integer_columns:
+                numeric_series = pd.to_numeric(prepared_dataframe[column_name], errors="coerce")
+                invalid_mask = numeric_series.isna() & prepared_dataframe[column_name].notna()
+                if invalid_mask.any():
+                    invalid_values = prepared_dataframe.loc[invalid_mask, column_name].drop_duplicates().head(5).tolist()
+                    logger.error(
+                        "Spalte '%s' enthaelt Werte, die nicht als Integer interpretierbar sind: %s",
+                        column_name,
+                        invalid_values,
+                    )
+                    return None
+
+                decimal_mask = numeric_series.notna() & ((numeric_series % 1) != 0)
+                if decimal_mask.any():
+                    invalid_values = prepared_dataframe.loc[decimal_mask, column_name].drop_duplicates().head(5).tolist()
+                    logger.error(
+                        "Spalte '%s' enthaelt nicht-ganzzahlige Werte: %s",
+                        column_name,
+                        invalid_values,
+                    )
+                    return None
+
+                prepared_dataframe[column_name] = numeric_series.astype("Int64")
+            else:
+                try:
+                    prepared_dataframe[column_name] = prepared_dataframe[column_name].astype("string")
+                except Exception as error:
+                    logger.error("Spalte '%s' konnte nicht in string konvertiert werden: %s", column_name, error)
+                    return None
+
+        prepared_dataframe.attrs["stammdaten_spalten"] = stammdaten_spalten
+        logger.info(
+            "Urdatenframe erfolgreich vorbereitet: %s Zeilen, %s Spalten, %s Stammdaten-Spalten.",
+            len(prepared_dataframe),
+            len(prepared_dataframe.columns),
+            len(stammdaten_spalten),
+        )
+        return prepared_dataframe
 
     @staticmethod
     def _is_series_string_like(series):
@@ -357,39 +432,6 @@ class Comparison:
         self.relation_firmen_instances = instances
         logger.info("%s relation_firmen-Instanzen in Comparison gespeichert.", len(self.relation_firmen_instances))
         return self.relation_firmen_instances
-
-    def remove_nan_mask(self, logger):
-        """
-            DQ schreibt in manchen Spalten bei fehlenden Werten ein ---
-            Wirkt für die Auswertung störend - Regel der Anwendung auch nicht klar.
-        """
-
-        self.comparison_data.replace("---", "", inplace=True)
-        logger.info("Bereinigung der NaN für {} begonnen.".format(self.sourcefile.split("\\")[-1]))
-
-    def normalize_column_names(self, logger):
-        """
-            Zugriff auf Spalten erschwert, wenn unterschiedliche Schreibweisen zu berücksichtigen sind.
-            Entfernen der Sternchen aus den Spaltennamen.
-        """
-        logger.info("Bereinigung Spaltennamen für {} begonnen.".format(self.sourcefile.split("\\")[-1]))
-        logger.info("Bestehende Spaltennamen: {}".format(self.comparison_data.columns))
-        self.extract_stammdaten_and_normalize_column_names()
-        logger.info("Angepasste Spaltennamen: {}".format(self.comparison_data.columns))
-
-    def turn_apolloid_to_apollofirmenid(self, logger):
-        """
-            Aus praktischen Gründen soll weiterhin die Möglichkeit bestehen nicht aufbereitete Leadtabellen als Firmenabgleich
-            zu nutzen. Solche Tablennen haben dann eine ApolloID und deren Firmenbestandteil ist zunächst zu entfernen.
-        """
-        if "ApolloID" in self.comparison_data.columns:
-            logger.info("Spalte ApolloID wird neu erstellt als ApolloFirmenID.")
-            self.comparison_data["ApolloFirmenID"] = self.comparison_data["ApolloID"].str.split("_").str[1]
-            self.comparison_data.drop(columns="ApolloID", inplace=True)
-
-    def run_data_cleaning(self, logger):
-        for function_name in self.ORDER_CLEAN_DATA:
-            getattr(self, function_name)(logger)
 
     def detect_doublet_groups(self, logger):
         """
