@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 logfile_DQResultshandler.txt
 pytest_DQResultsHandler.bat
+.claude/

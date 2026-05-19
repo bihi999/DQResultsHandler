@@ -30,15 +30,6 @@ class Comparison:
 
     """
     
-    # Die Klasse sollte speichern, aus welchem Dokument ihre Daten kommen.
-
-    # Als FACTORY-KLASSE erhält Comparison ALLE Daten die valide DQ-Daten sind - was dann später damit möglich ist
-    # bestimmt die Klasse je selbst. Sie ist dafür die Schaltzentrale.
-
-    # Darum muss sie auch je prüfen, ob sie bspw. in Ermangelung von IDs überhaupt ein Abgleich möglich bzw. sinnvoll ist.
-
-    # Dort wo nicht sinnvoll, muss sie das abfangen und benennen / loggen.
-
     def __init__(self, comparison_type, comparison_columns, comparison_data, sourcefile):
         self.comparison_type = comparison_type
         self.comparison_columns = comparison_columns
@@ -47,7 +38,6 @@ class Comparison:
         self.comparison_count = 0
         self.doublet_groups = {}
         self.found_relations = pd.DataFrame()
-        self.doubletgroup_counter = 0
         self.reorganized_doublet_groups = pd.DataFrame()
         
         
@@ -56,6 +46,13 @@ class Comparison:
     
     @staticmethod
     def extract_comparison_columns(menge_aller_spaltennamen, menge_DQ_spaltennamen, logger):    
+        
+        """
+            Excel-Tabellen von DQ enthalten standardmäßig einige Spalten die DQ erstellt.
+            Davon wird das Vorhandensein von "Nr." bereits vorab geprüft - sonst keine Gruppenbildung möglich.
+            Aus den sonstigen Spalten sind die ohne Sternchen im Abgleich enthalten, alle anderen nicht.
+        """
+        
         
         if isinstance(menge_aller_spaltennamen, pd.Index):
             logger.info("df.Index-Objekt erhalten. Umwandlung in Menge.")
@@ -77,17 +74,12 @@ class Comparison:
     
     
     @staticmethod
-    # anforderung: eine eigene funktion soll prüfen ob überhaupt paare von ids gebildet werden können
-    # das wäre dann optional eine prüfung in __main__ die zur verfügung steht
-    # es war keine initiale anforderung, daher nicht in detect_comparison_type reinprügeln
-    # nicht hart vercoden hier - die Namen der ID-Spalten müssen in der Klasse verwaltet werden
-    def check_for_ids_in_columns():
-        pass
-    
-
-
-    @staticmethod
     def detect_comparison_type(comparison_column_names, contact_fields, logger):
+        
+        """
+            Anhand der Spaltennamen die im Abgleich enthalten sind, wird die Art des Abgleichs ermittelt.
+        """
+        
         
         detect_comparison_type_return_string = ""
 

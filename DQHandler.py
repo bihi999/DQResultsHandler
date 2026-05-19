@@ -16,6 +16,19 @@ from excel_functions import excel_classes as ec
 from helper_functions.pandas_functions import export_dataframe_to_excel
 
 
+"""
+    Abgleichsergebnisse aus dem DQ-Tool liegen als Excel-Tabellen vor. Unterschiedliche Abgleiche für gleiche Firmen und Kontakte sollen
+    zusammengeführt werden. Die zusammengeführten Abgleiche müssen einheitlich mit ihren Stammdaten angereichert und als zu entscheidende
+    Listen ausgegeben werden.
+
+
+        DataFrames (dict) - Dateipfade sind die Schlüssel - die eingelesenen Frames die Werte
+        DQFileFolder - IndividualFolderExcel-Objekt
+        DQComparisonInstanzen (list) - Je Data Frame ein Comparison - Objekt - organisiert als Liste 
+
+
+"""
+
 DataFrames = {}
 DQComparisonInstanzen = []
 found_relations = []
@@ -53,5 +66,23 @@ else:
 
 if DQFileFolder.excel_file_list:
     DataFrames = DQFileFolder.load_all_excel_files_as_dataframes(logger)
+
+
+for quelldatei, _DataFrame in DataFrames.items():
+    
+    menge_abgleichsspalten = set()
+    menge_abgleichsspalten = cc.Comparison.extract_comparison_columns(_DataFrame.columns, cc.Comparison.default_column_names, logger)
+    
+    
+    if menge_abgleichsspalten:
+        string_abgleichstyp = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, cc.Comparison.contact_fields, logger)
+    else:
+        logger.info("Es wurden keine Abgleichsspalten ermittelt - keine Auswertung möglich.")
+        continue
+
+    DQComparisonInstanzen.append(cc.Comparison(string_abgleichstyp, menge_abgleichsspalten, _DataFrame, quelldatei))
+
+
+
 
 
