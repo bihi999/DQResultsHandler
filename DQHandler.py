@@ -75,12 +75,14 @@ for quelldatei, _DataFrame in DataFrames.items():
     
     
     if menge_abgleichsspalten:
-        string_abgleichstyp = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, logger)
+        try:
+            comparison_type = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, set(_DataFrame.columns), logger)
+            DQComparisonInstanzen.append(cc.Comparison(comparison_type, menge_abgleichsspalten, _DataFrame, quelldatei))
+        except cc.ComparisonTypeDetectionError:
+            continue
     else:
         logger.info("Es wurden keine Abgleichsspalten ermittelt - keine Auswertung möglich.")
         continue
-
-    DQComparisonInstanzen.append(cc.Comparison(string_abgleichstyp, menge_abgleichsspalten, _DataFrame, quelldatei))
 
 
 

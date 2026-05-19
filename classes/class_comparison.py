@@ -24,6 +24,12 @@ class ComparisonColumnSet(Enum):
     CONTACT_FIELDS = frozenset(["Vorname", "Nachname", "Funktion_Freifeld", "Position", "E-Mail", "Position / Funktion_Freifeld"])
 
 
+class ComparisonTypeDetectionError(Exception):
+    """
+        Wird geworfen, wenn aus den Spaltennamen kein unterstuetzter Abgleichstyp erkannt werden kann.
+    """
+
+
 class Comparison:
     """
         Steuert die Verarbeitung einer DQ-Ergebnisliste aus der Dublettensuche.
@@ -33,7 +39,7 @@ class Comparison:
         verarbeitet und anschließend wieder zu klickerfähigen Dublettengruppen sowie auswertbaren Firmenrelationen zusammengeführt.
 
         Args:
-            comparison_type (str): Erkannter Abgleichstyp, z. B. "Firmenabgleich_name", "Firmenabgleich_domain" usw.
+            comparison_type (ComparisonType): Erkannter Abgleichstyp.
             comparison_columns (set[str]): Spaltennamen, die im DQ-Abgleich tatsächlich als Vergleichsdaten verwendet wurden.
             comparison_data (pd.DataFrame): DQ-Ergebnistabelle mit allen Zeilen und Metadaten der Dublettensuche.
             sourcefile (str): Pfad oder Dateiname der Quelldatei, aus der die Vergleichsdaten stammen.
@@ -106,62 +112,73 @@ class Comparison:
     
     
     @staticmethod
-    def detect_comparison_type(comparison_column_names, logger=None):
+    def detect_comparison_type(comparison_column_names, menge_aller_spaltennamen, logger=None):
         
         """
             Anhand der Spaltennamen die im Abgleich enthalten sind, wird die Art des Abgleichs ermittelt.
         """
+        if not isinstance(comparison_column_names, set) or not all(isinstance(column_name, str) for column_name in comparison_column_names):
+            if logger:
+                logger.error("comparison_column_names muss eine Menge aus Strings sein.")
+            raise ComparisonTypeDetectionError("comparison_column_names muss eine Menge aus Strings sein.")
+
+        if not isinstance(menge_aller_spaltennamen, set) or not all(isinstance(column_name, str) for column_name in menge_aller_spaltennamen):
+            if logger:
+                logger.error("menge_aller_spaltennamen muss eine Menge aus Strings sein.")
+            raise ComparisonTypeDetectionError("menge_aller_spaltennamen muss eine Menge aus Strings sein.")
+
+        default_column_names = ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value
         contact_fields = ComparisonColumnSet.CONTACT_FIELDS.value
-        
-        detect_comparison_type_return_string = ""
+        spaltennamen_ohne_default = menge_aller_spaltennamen - default_column_names
 
-        # Vorname und Nachname ist immer Abgleich auf Kontakte
-        if {"Vorname", "Nachname"}.issubset(comparison_column_names):
-            detect_comparison_type_return_string = "Kontaktabgleich_name"
-            if logger:
-                logger.info("abgleichstyp: Kontaktabgleich_name")
-        
-        # Nur Firmenname und keine individuellen Suchfelder ist immer Abgleich auf Firmen(name)
-        elif (comparison_column_names.isdisjoint(contact_fields)  
-            and comparison_column_names == {"Firmenname"})            :
-            detect_comparison_type_return_string = "Firmenabgleich_name"
-            if logger:
-                logger.info("abgleichstyp: Firmenabgleich_name")
-        
-        elif (comparison_column_names == {"domain"} and
-              comparison_column_names.isdisjoint(contact_fields)):
-            detect_comparison_type_return_string = "Firmenabgleich_domain"
-            if logger:
-                logger.info("abgleichstyp: Firmenabgleich_domain")
+        firmenabgleich_pflichtfelder = {"WebFirmenID", "firmentupel_apollo"}
+        firmenabgleich_ausschlussfelder = {"WebID", "ApolloMemberID"}
+        pruefung_firmenabgleich_erfolgreich = (
+            firmenabgleich_pflichtfelder.issubset(spaltennamen_ohne_default)
+            and spaltennamen_ohne_default.isdisjoint(firmenabgleich_ausschlussfelder)
+            and comparison_column_names.isdisjoint(contact_fields)
+        )
 
-        elif (comparison_column_names.isdisjoint(contact_fields)  
-            and comparison_column_names == {"Firmenname", "Bundesland\\Kanton"}):
-            detect_comparison_type_return_string = "Firmenabgleich_name"
+        if pruefung_firmenabgleich_erfolgreich:
             if logger:
-                logger.info("abgleichstyp: Firmenabgleich_name_bundesland")
-        
-        elif (comparison_column_names.isdisjoint(contact_fields) and
-              comparison_column_names == {"Firmenname", "domain"}):
-             detect_comparison_type_return_string = "Firmenabgleich_domain_name"
-             if logger:
-                 logger.info("abgleichstyp: Firmenabgleich_domain_name")
+                logger.info("Abgleichstyp erfolgreich erkannt: %s", ComparisonType.FIRMENABGLEICH.value)
+            return ComparisonType.FIRMENABGLEICH
 
-        elif (comparison_column_names.isdisjoint(contact_fields) and
-              comparison_column_names == {"Bundesland\\Kanton", "domain"}):
-             detect_comparison_type_return_string = "Firmenabgleich_domain_name"
-             if logger:
-                 logger.info("abgleichstyp: Firmenabgleich_domain_bundesland")
-        
-        
-        else:
-            detect_comparison_type_return_string = "Unbekannt"
+        if logger:
+            logger.info(
+                "Pruefung auf %s nicht erfolgreich. Pflichtfelder vorhanden: %s. Ausschlussfelder abwesend: %s. Keine Kontaktfelder in Vergleichsspalten: %s.",
+                ComparisonType.FIRMENABGLEICH.value,
+                firmenabgleich_pflichtfelder.issubset(spaltennamen_ohne_default),
+                spaltennamen_ohne_default.isdisjoint(firmenabgleich_ausschlussfelder),
+                comparison_column_names.isdisjoint(contact_fields),
+            )
+
+        kontaktabgleich_pflichtfelder = {"WebID", "ApolloMemberID"}
+        pruefung_kontaktabgleich_erfolgreich = kontaktabgleich_pflichtfelder.issubset(spaltennamen_ohne_default)
+
+        if pruefung_kontaktabgleich_erfolgreich:
             if logger:
-                logger.info("Ableichsspalten {} lassen sich keinem abgleichstyp zuordnen".format(("-").join(comparison_column_names)))
+                logger.info("Abgleichstyp erfolgreich erkannt: %s", ComparisonType.KONTAKTABGLEICH.value)
+            return ComparisonType.KONTAKTABGLEICH
 
+        if logger:
+            logger.info(
+                "Pruefung auf %s nicht erfolgreich. Pflichtfelder vorhanden: %s.",
+                ComparisonType.KONTAKTABGLEICH.value,
+                kontaktabgleich_pflichtfelder.issubset(spaltennamen_ohne_default),
+            )
 
-        print(("-").join(comparison_column_names))
-        
-        return detect_comparison_type_return_string
+            gepruefte_comparison_types = {ComparisonType.FIRMENABGLEICH, ComparisonType.KONTAKTABGLEICH}
+            ungepruefte_comparison_types = set(ComparisonType) - gepruefte_comparison_types
+            if ungepruefte_comparison_types:
+                logger.warning(
+                    "ComparisonType enthaelt ungepruefte Typen: %s",
+                    ", ".join(comparison_type.value for comparison_type in ungepruefte_comparison_types),
+                )
+
+            logger.error("Abgleichsspalten %s lassen sich keinem unterstuetzten Abgleichstyp zuordnen.", "-".join(comparison_column_names))
+
+        raise ComparisonTypeDetectionError("Aus den Spaltennamen konnte kein unterstuetzter Abgleichstyp erkannt werden.")
 
     
     
@@ -214,12 +231,12 @@ class Comparison:
         single_doublet_group = pd.DataFrame()
         
         logger.info("In {} wurden {} Dublettengruppen gefunden.".format(self.sourcefile.split("\\")[-1], self.comparison_count))
-        if self.comparison_type in ["Firmenabgleich_name", "Firmenabgleich_domain", "Firmenabgleich_domain_name"]:
+        if self.comparison_type == ComparisonType.FIRMENABGLEICH:
              for _int in range(1, self.comparison_count + 1):
                 single_doublet_group = self.comparison_data[self.comparison_data["Nr."] == _int]
                 self.doublet_groups[_int] = ComparisonCompany_ID_wise(single_doublet_group, _int, self.comparison_columns)
         else:
-            logger.info("Skript verarbeitet aktuell nur Firmenabgleiche. Erkannter Abgleichstyp {} wird nicht unterstützt.".format(self.comparison_type))
+            logger.info("Skript verarbeitet aktuell nur Firmenabgleiche. Erkannter Abgleichstyp {} wird nicht unterstützt.".format(self.comparison_type.value))
         
                         
         return
