@@ -14,6 +14,7 @@ from classes.abandoned_classes import ComparisonCompany_ID_wise
 from excel_functions import excel_classes as ec
 
 from helper_functions.pandas_functions import export_dataframe_to_excel
+from helper_functions.dataframe_evaluation import combine_stammdaten_from_comparisons, enrich_dataframe_with_stammdaten
 
 
 """
@@ -33,6 +34,7 @@ DataFrames = {}
 DQComparisonInstanzen = []
 found_relations = []
 found_relations_valid = []
+stammdaten = {}
 
 skript_pfad = Path(__file__).parent
 logfile_pfad = skript_pfad / "logfile_DQResultshandler.txt"
@@ -85,6 +87,22 @@ for quelldatei, _DataFrame in DataFrames.items():
         continue
 
 
+stammdaten = combine_stammdaten_from_comparisons(DQComparisonInstanzen, logger)
 
+for DQComparisonInstanz in DQComparisonInstanzen:
+    DQComparisonInstanz.run_data_cleaning(logger)
+    DQComparisonInstanz.detect_doublet_groups(logger)
+    DQComparisonInstanz.process_doubletgroups(logger)
+    DQComparisonInstanz.print_summary(logger)
+    DQComparisonInstanz.summarize_company_relations(logger)
+    DQComparisonInstanz.summarize_doublet_groups(logger)
+    found_relations.append(DQComparisonInstanz.found_relations)
 
+found_relations_valid = cr.prepare_dataframes(found_relations, logger)
+relations_firma = cr.create_instances(found_relations_valid, logger)
+export_dict = cr.reorganize_instances(relations_firma, logger)
+relations_dataframe = cr.build_relation_dataframe(export_dict, logger)
+relations_dataframe_enriched = enrich_dataframe_with_stammdaten(stammdaten, relations_dataframe, logger)
 
+export_dataframe_to_excel(relations_dataframe, ImportPath, "unknown.xlsx", logger, "_relations")
+export_dataframe_to_excel(relations_dataframe_enriched, ImportPath, "unknown.xlsx", logger, "_relations_angereichert")

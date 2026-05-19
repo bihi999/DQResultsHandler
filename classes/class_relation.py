@@ -129,7 +129,7 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
         logger.error("Die übergebene DataFrame-Liste ist leer.")
         return []
 
-    required_cols = list(relation_firma.REQUIRED_SCHEMA.keys())
+    required_cols = list(relation_firmen.REQUIRED_SCHEMA.keys())
     valid_dataframes = []
 
     for idx, df in enumerate(dataframes, start=1):
@@ -148,7 +148,7 @@ def prepare_dataframes(dataframes: list[pd.DataFrame], logger, strict: bool = Tr
 
         # Datentyp-Check + Konvertierung
         dtype_errors = []
-        for col, expected in relation_firma.REQUIRED_SCHEMA.items():
+        for col, expected in relation_firmen.REQUIRED_SCHEMA.items():
             s = df[col]
             is_ok = False
 
@@ -341,14 +341,14 @@ def create_instances(
     dataframes: Iterable[pd.DataFrame],
     logger,
     deduplicate: bool = True
-) -> List[relation_firma]:
+) -> List[relation_firmen]:
     """
     Erwartet: bereits validierte/bereinigte DataFrames mit korrekten Dtypes.
-    Erzeugt Instanzen von relation_firma.
+    Erzeugt Instanzen von relation_firmen.
     - deduplicate=True: entfernt identische Instanzen über Mengenlogik (__eq__/__hash__).
     """
     total_rows = 0
-    raw_instances: List[relation_firma] = []
+    raw_instances: List[relation_firmen] = []
 
     for idx, df in enumerate(dataframes, start=1):
         n = len(df)
@@ -358,10 +358,8 @@ def create_instances(
         # Keine weitere Transformation hier – die Aufbereitung passiert vorher.
         for _, row in df.iterrows():
             try:
-                inst = relation_firma(
-                    row["ApolloFirmenID"],
-                    row["Firmenname"],
-                    row["Ort"],
+                inst = relation_firmen(
+                    row["firmentupel_apollo"],
                     row["WebFirmenID"],
                     row["Relation"],
                     row["Relation_staerke"],
@@ -378,7 +376,7 @@ def create_instances(
         return raw_instances
 
     # Deduplizierung via Set (nutzt __hash__/__eq__)
-    unique_set: Set[relation_firma] = set(raw_instances)
+    unique_set: Set[relation_firmen] = set(raw_instances)
     deduped = list(unique_set)
     removed = len(raw_instances) - len(deduped)
     logger.info(f"Deduplizierung: {removed} Duplikate entfernt, {len(deduped)} eindeutige Instanzen verbleiben.")
@@ -389,24 +387,24 @@ def create_instances(
     return deduped
 
 def reorganize_instances(
-    deduped: Iterable[relation_firma],
+    deduped: Iterable[relation_firmen],
     logger
-) -> Dict[Tuple[str, str, str], Dict[int, Set[Tuple[Optional[str], Optional[int]]]]]:
+) -> Dict[str, Dict[int, Set[Tuple[Optional[str], Optional[int]]]]]:
     """
     Organisiert Instanzen in eine verschachtelte Struktur:
 
       {
-        (ApolloFirmenID, Ort, Firmenname): {
+        firmentupel_apollo: {
             WebFirmenID: { (Relation, Relation_staerke), ... }   # Menge von Tupeln
         }
       }
 
-    - Der kombinierte Key ist ein Tupel (ApolloFirmenID, Ort, Firmenname) und lässt sich 1:1 wieder zerlegen.
+    - Der Key ist firmentupel_apollo.
     - Für jede WebFirmenID sammeln wir *alle* beobachteten (Relation, Relation_staerke)-Paare in einer Set-Menge.
       -> identische Paare werden automatisch dedupliziert.
     - Fehlende Werte werden als None gespeichert.
     """
-    result: Dict[Tuple[str, str, str], Dict[int, Set[Tuple[Optional[str], Optional[int]]]]] = {}
+    result: Dict[str, Dict[int, Set[Tuple[Optional[str], Optional[int]]]]] = {}
 
     total_instances = 0
     added_pairs = 0
@@ -416,8 +414,7 @@ def reorganize_instances(
     for i, inst in enumerate(deduped, start=1):
         total_instances += 1
         try:
-            # Kombinierter Schlüssel (verlustfrei zerlegbar)
-            key = (str(inst.ApolloFirmenID), str(inst.Ort), str(inst.Firmenname))
+            key = str(inst.firmentupel_apollo)
 
             # WebFirmenID prüfen/normalisieren
             webid_raw = inst.WebFirmenID
@@ -471,8 +468,8 @@ def reorganize_instances(
 
 
 # Optional: Helfer zum Zerlegen des kombinierten Schlüssels
-def split_composite_key(key: Tuple[str, str, str]) -> Tuple[str, str, str]:
-    """Gibt (ApolloFirmenID, Ort, Firmenname) zurück."""
+def split_composite_key(key: str) -> str:
+    """Gibt firmentupel_apollo zurück."""
     return key
 
 
@@ -503,15 +500,15 @@ def _coerce_to_int64_with_logging(df: pd.DataFrame, col: str, logger) -> None:
 
 
 def build_relation_dataframe(
-    grouped: Dict[Tuple[str, str, str], Dict[int, Set[Tuple[Optional[str], Optional[int]]]]],
+    grouped: Dict[str, Dict[int, Set[Tuple[Optional[str], Optional[int]]]]],
     logger
 ) -> pd.DataFrame:
     """
     Wandelt die verschachtelte Struktur in einen DataFrame um.
 
-    Spalten: ApolloFirmenID, Ort, Firmenname, WebfirmenID, abgl_<Relation...>, Score
+    Spalten: firmentupel_apollo, WebFirmenID, abgl_<Relation...>, Score
 
-    - pro (ApolloFirmenID, Ort, Firmenname) x WebfirmenID entsteht genau eine Zeile
+    - pro firmentupel_apollo x WebFirmenID entsteht genau eine Zeile
     - in jeder Relations-Spalte steht die höchste gefundene Relation_staerke (falls vorhanden), sonst NA
     - Score = Anzahl der (Relation, Relation_staerke)-Paare in der Menge für diese WebfirmenID
     - dynamische Relations-Spalten sind eindeutig durch Prefix 'abgl_'
@@ -542,7 +539,7 @@ def build_relation_dataframe(
 
     # 2) Zeilen aufbauen
     rows = []
-    for (apollo, ort, name), web_map in grouped.items():
+    for firmentupel_apollo, web_map in grouped.items():
         for webid, pairset in web_map.items():
             # pro Relation die höchste Stärke bestimmen (None wird ignoriert)
             best_strength: Dict[str, Optional[int]] = {}
@@ -559,10 +556,8 @@ def build_relation_dataframe(
                         best_strength[rel_key] = val
 
             row = {
-                "ApolloFirmenID": str(apollo),
-                "Ort": str(ort),
-                "Firmenname": str(name),
-                "WebfirmenID": int(webid),      # bereits korrekt formatiert
+                "firmentupel_apollo": str(firmentupel_apollo),
+                "WebFirmenID": int(webid),      # bereits korrekt formatiert
                 "Score": int(len(pairset)),     # Mächtigkeit der Menge
             }
             # Relations-Spalten füllen (fehlende -> NA); Spaltennamen sind prefixiert
@@ -574,7 +569,7 @@ def build_relation_dataframe(
     df = pd.DataFrame(rows)
 
     # 3) Spaltenreihenfolge und fehlende Spalten abfangen
-    ordered_cols = ["ApolloFirmenID", "Ort", "Firmenname", "WebfirmenID"] + dynamic_cols + ["Score"]
+    ordered_cols = ["firmentupel_apollo", "WebFirmenID"] + dynamic_cols + ["Score"]
     for col in ordered_cols:
         if col not in df.columns:
             df[col] = pd.NA
@@ -582,17 +577,15 @@ def build_relation_dataframe(
 
     # 4) Dtypes & Sortierung (robust)
     if not df.empty:
-        df["ApolloFirmenID"] = df["ApolloFirmenID"].astype("string")
-        df["Ort"] = df["Ort"].astype("string")
-        df["Firmenname"] = df["Firmenname"].astype("string")
-        # KEIN Re-Cast von "WebfirmenID" – sollte bereits int/Int64 sein
+        df["firmentupel_apollo"] = df["firmentupel_apollo"].astype("string")
+        # KEIN Re-Cast von "WebFirmenID" – sollte bereits int/Int64 sein
 
         # Relations-Spalten & Score robust in Int64 überführen
         for col in dynamic_cols + ["Score"]:
             _coerce_to_int64_with_logging(df, col, logger)
 
         df = df.sort_values(
-            by=["ApolloFirmenID", "Ort", "Firmenname", "WebfirmenID"],
+            by=["firmentupel_apollo", "WebFirmenID"],
             kind="stable"
         ).reset_index(drop=True)
 

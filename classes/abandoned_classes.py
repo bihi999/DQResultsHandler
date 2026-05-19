@@ -32,7 +32,7 @@ class ComparisonCompany_ID_wise:
         self.companies_leads_dataframe = pd.DataFrame()
         self.companies_crm_dataframe = pd.DataFrame()
         self.new_doubletgroups = [] 
-        self.relations = pd.DataFrame(columns = ["ApolloFirmenID", "Firmenname", "Ort", "WebFirmenID", "Relation", "Relation_staerke"])
+        self.relations = pd.DataFrame(columns = ["firmentupel_apollo", "WebFirmenID", "Relation", "Relation_staerke"])
         self.prerequisites = False
 
     # Für vereinheitlichte run - Funktion muss Liste mit Funktionsnamen vorliegen.    
@@ -44,9 +44,7 @@ class ComparisonCompany_ID_wise:
             Prüfe das Ort, WebFirmenID, Firmenname und ApolloID enthalten sind und setze self.prerequisites dann auf True - sonst Fehlerlog.
         """
         self.prerequisites = ("WebFirmenID" in self.doubletgroup_dataframe.columns
-                                and "Ort" in self.doubletgroup_dataframe.columns
-                                and "ApolloFirmenID" in self.doubletgroup_dataframe.columns
-                                and "Firmenname" in self.doubletgroup_dataframe.columns)
+                                and "firmentupel_apollo" in self.doubletgroup_dataframe.columns)
         
         if self.prerequisites == False:
             logger.info("Dublettengruppe {} enthält nicht die erforderlichen Spalten für die Verzeinzelung.".format(self.doubletgroup_number))
@@ -56,7 +54,7 @@ class ComparisonCompany_ID_wise:
             Erstelle einen DataFrame aus self.doubletgroup_dataframe der nur die Zeilen mit einer ApolloFirmenID enthölt.
         """
 
-        self.companies_leads_dataframe = self.doubletgroup_dataframe[self.doubletgroup_dataframe["ApolloFirmenID"].notna() & (self.doubletgroup_dataframe["ApolloFirmenID"] != "")]
+        self.companies_leads_dataframe = self.doubletgroup_dataframe[self.doubletgroup_dataframe["firmentupel_apollo"].notna() & (self.doubletgroup_dataframe["firmentupel_apollo"] != "")]
         #logger.info("Für Dublettengruppe {} wurden {} Zeilen mit Apollo-Firmeninformationen ermittelt.".format(self.doubletgroup_number, len(self.companies_leads_dataframe)))
         #logger.info(self.companies_leads_dataframe)
     
@@ -73,7 +71,7 @@ class ComparisonCompany_ID_wise:
             Daher wird auf beide Werte zurückgegriffen.
         """
         initial_length = len(self.companies_leads_dataframe)
-        self.companies_leads_dataframe = self.companies_leads_dataframe.drop_duplicates(subset=["ApolloFirmenID", "Ort"])
+        self.companies_leads_dataframe = self.companies_leads_dataframe.drop_duplicates(subset=["firmentupel_apollo"])
         #logger.info("Für Dublettengruppe {} bleiben nach Deduplizierung {} von {} Apollo-Firmen-Einträge erhalten.".format(self.doubletgroup_number, initial_length, len(self.companies_leads_dataframe)))
 
     def extract_crm_companies(self, logger):
@@ -102,8 +100,8 @@ class ComparisonCompany_ID_wise:
             new_doubletgroup = pd.DataFrame([row])
             new_doubletgroup = pd.concat([new_doubletgroup, self.companies_crm_dataframe], ignore_index = True)
             
-            new_doubletgroup["ApolloFirmenID"] = new_doubletgroup["ApolloFirmenID"].replace(["", "nan", 0], pd.NA)
-            new_doubletgroup["ApolloFirmenID"] = new_doubletgroup["ApolloFirmenID"].ffill()
+            new_doubletgroup["firmentupel_apollo"] = new_doubletgroup["firmentupel_apollo"].replace(["", "nan", 0], pd.NA)
+            new_doubletgroup["firmentupel_apollo"] = new_doubletgroup["firmentupel_apollo"].ffill()
             
             self.new_doubletgroups.append(new_doubletgroup)
             
@@ -124,17 +122,13 @@ class ComparisonCompany_ID_wise:
             von Textfeldern.
         """
         for doublet_group in self.new_doubletgroups:
-            ApolloFirmenID = doublet_group.iloc[0]["ApolloFirmenID"]
-            ApolloFirmenname = doublet_group.iloc[0]["Firmenname"]
-            ApolloFirmenOrt = doublet_group.iloc[0]["Ort"]
+            firmentupel_apollo = doublet_group.iloc[0]["firmentupel_apollo"]
             TypeRelation = "-".join(sorted(self.doubletgroup_comparison_columns))
 
 
 
             for _, row in doublet_group.iloc[1:].iterrows():
-                new_relation = {"ApolloFirmenID" : ApolloFirmenID,
-                                "Firmenname" : ApolloFirmenname,
-                                "Ort" : ApolloFirmenOrt,
+                new_relation = {"firmentupel_apollo" : firmentupel_apollo,
                                 "WebFirmenID" : int(row["WebFirmenID"]),
                                 "Relation" : TypeRelation,
                                 "Relation_staerke" : int(re.sub(r"%", "", row["%"]))}
