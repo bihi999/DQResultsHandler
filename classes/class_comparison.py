@@ -51,6 +51,41 @@ class Comparison:
             reorganized_doublet_groups (pd.DataFrame): Neu aufgebaute Dublettengruppen für die weitere Bearbeitung im Klickertool.
 
     """
+
+    class relation_firmen:
+        REQUIRED_SCHEMA = {
+            "firmentupel_apollo": "string",
+            "WebFirmenID": "Int64",
+            "Relation": "string",
+            "Relation_staerke": "Int64",
+        }
+
+        __slots__ = tuple(REQUIRED_SCHEMA.keys())
+
+        def __init__(self, firmentupel_apollo, WebFirmenID, Relation, Relation_staerke):
+            self.firmentupel_apollo = firmentupel_apollo
+            self.WebFirmenID = WebFirmenID
+            self.Relation = Relation
+            self.Relation_staerke = Relation_staerke
+
+        def _key(self):
+            return (
+                self.firmentupel_apollo,
+                self.WebFirmenID,
+                self.Relation,
+                self.Relation_staerke,
+            )
+
+        def __eq__(self, other):
+            if not isinstance(other, type(self)):
+                return NotImplemented
+            return self._key() == other._key()
+
+        def __hash__(self):
+            return hash(self._key())
+
+        def __repr__(self):
+            return f"relation_firmen({self.firmentupel_apollo})"
     
     def __init__(self, comparison_type: ComparisonType, comparison_columns, comparison_data, sourcefile):
         self.comparison_type = comparison_type
@@ -61,6 +96,7 @@ class Comparison:
         self.doublet_groups = {}
         self.found_relations = pd.DataFrame()
         self.reorganized_doublet_groups = pd.DataFrame()
+        self.relation_firmen_instances = []
 
     @property
     def comparison_type(self):
@@ -185,6 +221,116 @@ class Comparison:
     # Data Frame zunächst zentral aufbereiten.
 
     ORDER_CLEAN_DATA = ["remove_nan_mask", "normalize_column_names", "turn_apolloid_to_apollofirmenid"]
+
+    @staticmethod
+    def _is_series_string_like(series):
+        if pd.api.types.is_string_dtype(series.dtype):
+            return True
+        if pd.api.types.is_object_dtype(series.dtype):
+            non_na = series.dropna()
+            if non_na.empty:
+                return True
+            return all(isinstance(value, str) for value in non_na)
+        return False
+
+    @staticmethod
+    def _is_series_int_like(series):
+        if str(series.dtype) == "Int64":
+            return True
+        return pd.api.types.is_integer_dtype(series.dtype)
+
+    @staticmethod
+    def _coerce_to_int64_with_logging(dataframe, column_name, logger):
+        original_series = dataframe[column_name]
+        numeric_series = pd.to_numeric(original_series, errors="coerce")
+
+        non_numeric_mask = numeric_series.isna() & original_series.notna()
+        non_numeric_count = int(non_numeric_mask.sum())
+        if non_numeric_count:
+            logger.warning("Spalte '%s': %s nicht-numerische Werte zu NA gesetzt.", column_name, non_numeric_count)
+
+        decimal_mask = numeric_series.notna() & ((numeric_series % 1) != 0)
+        decimal_count = int(decimal_mask.sum())
+        if decimal_count:
+            logger.warning("Spalte '%s': %s Dezimalwerte vor Int-Cast gerundet.", column_name, decimal_count)
+            numeric_series = numeric_series.round(0)
+
+        dataframe[column_name] = numeric_series.astype("Int64")
+
+    def prepare_relation_firmen_dataframe(self, dataframe, logger, strict=True):
+        """
+            Prueft und normalisiert einen DataFrame fuer Comparison.relation_firmen.
+        """
+        schema = self.relation_firmen.REQUIRED_SCHEMA
+        required_columns = list(schema.keys())
+
+        missing_columns = [column_name for column_name in required_columns if column_name not in dataframe.columns]
+        extra_columns = [column_name for column_name in dataframe.columns if column_name not in required_columns]
+
+        if missing_columns:
+            logger.error("DataFrame fuer relation_firmen fehlt folgende Spalten: %s", missing_columns)
+            return None
+
+        if strict and extra_columns:
+            logger.error("DataFrame fuer relation_firmen enthaelt unerlaubte zusaetzliche Spalten: %s", extra_columns)
+            return None
+
+        prepared_dataframe = dataframe.copy()
+        dtype_errors = []
+
+        for column_name, expected_dtype in schema.items():
+            series = prepared_dataframe[column_name]
+
+            if expected_dtype == "string":
+                if self._is_series_string_like(series):
+                    prepared_dataframe[column_name] = series.astype("string")
+                    continue
+
+                logger.warning("Spalte '%s': falscher Typ %s, versuche Umwandlung in string.", column_name, series.dtype)
+                try:
+                    prepared_dataframe[column_name] = series.astype("string")
+                except Exception as error:
+                    dtype_errors.append(f"Spalte '{column_name}' konnte nicht in string konvertiert werden: {error}")
+
+            elif expected_dtype == "Int64":
+                if self._is_series_int_like(series):
+                    prepared_dataframe[column_name] = series.astype("Int64")
+                    continue
+
+                logger.warning("Spalte '%s': falscher Typ %s, versuche Umwandlung in Int64.", column_name, series.dtype)
+                try:
+                    self._coerce_to_int64_with_logging(prepared_dataframe, column_name, logger)
+                except Exception as error:
+                    dtype_errors.append(f"Spalte '{column_name}' konnte nicht in Int64 konvertiert werden: {error}")
+            else:
+                dtype_errors.append(f"Spalte '{column_name}' hat nicht unterstuetzten Zieltyp {expected_dtype}.")
+
+        if dtype_errors:
+            for error_message in dtype_errors:
+                logger.error("DataFrame fuer relation_firmen: %s", error_message)
+            return None
+
+        logger.info("DataFrame fuer relation_firmen erfolgreich vorbereitet.")
+        return prepared_dataframe[required_columns]
+
+    def create_relation_firmen_instances(self, dataframe, logger, deduplicate=True):
+        prepared_dataframe = self.prepare_relation_firmen_dataframe(dataframe, logger)
+        if prepared_dataframe is None:
+            return []
+
+        instances = []
+        for row_index, row in prepared_dataframe.iterrows():
+            try:
+                instances.append(self.relation_firmen(**{column_name: row[column_name] for column_name in self.relation_firmen.REQUIRED_SCHEMA}))
+            except Exception as error:
+                logger.error("relation_firmen-Instanz konnte in Zeile %s nicht erzeugt werden: %s", row_index, error)
+
+        if deduplicate:
+            instances = list(set(instances))
+
+        self.relation_firmen_instances = instances
+        logger.info("%s relation_firmen-Instanzen in Comparison gespeichert.", len(self.relation_firmen_instances))
+        return self.relation_firmen_instances
 
     def remove_nan_mask(self, logger):
         """
