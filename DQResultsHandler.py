@@ -78,7 +78,7 @@ for quelldatei, _DataFrame in DataFrames.items():
     if menge_abgleichsspalten:
         try:
             comparison_type = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, set(_DataFrame.columns), logger)
-            evaluated_stammdaten = evaluate_stammdaten_dataframes(_DataFrame, menge_abgleichsspalten, logger)
+            evaluated_stammdaten = evaluate_stammdaten_dataframes(_DataFrame, cc.ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value, logger)
             for id_column in IdColumn:
                 id_column_name = id_column.value
                 if id_column_name not in evaluated_stammdaten:

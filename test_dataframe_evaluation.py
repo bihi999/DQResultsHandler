@@ -32,21 +32,23 @@ def test_enrich_dataframe_with_stammdaten_left_joins_without_duplicate_id():
     assert pd.isna(enriched_dataframe.loc[2, "WebFirmenID_Firmenname"])
 
 
-def test_evaluate_stammdaten_dataframes_keeps_dict_structure_and_deduplicates():
+def test_evaluate_stammdaten_dataframes_drops_given_columns_and_deduplicates():
     dataframe = pd.DataFrame(
         {
             "WebFirmenID": [1, 2, 2, None],
             "WebID": [None, None, 10, 11],
             "Firmenname": ["A GmbH", "B GmbH", "B GmbH", "C GmbH"],
             "Abgleichsspalte": ["x", "y", "y", "z"],
+            "Nr.": [1, 1, 1, 1],
             "LeereSpalte": [None, None, None, None],
         }
     )
 
-    stammdaten = evaluate_stammdaten_dataframes(dataframe, {"Abgleichsspalte"})
+    stammdaten = evaluate_stammdaten_dataframes(dataframe, {"Nr."})
 
     assert set(stammdaten) == {"WebFirmenID", "WebID"}
     assert len(stammdaten["WebFirmenID"]) == 2
     assert len(stammdaten["WebID"]) == 2
-    assert "Abgleichsspalte" not in stammdaten["WebFirmenID"].columns
+    assert "Abgleichsspalte" in stammdaten["WebFirmenID"].columns
+    assert "Nr." not in stammdaten["WebFirmenID"].columns
     assert "LeereSpalte" not in stammdaten["WebID"].columns
