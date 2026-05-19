@@ -50,5 +50,30 @@ def test_comparison_extracts_stammdaten_and_normalizes_column_names_on_init():
         "test.xlsx",
     )
 
-    assert instance.stammdaten == {"WebFirmenID", "(Nicht aendern) Firma"}
+    assert instance.stammdaten_spalten == {"WebFirmenID", "(Nicht aendern) Firma"}
     assert set(instance.comparison_data.columns) == {"Nr.", "Firmenname", "WebFirmenID", "(Nicht aendern) Firma"}
+
+
+def test_comparison_evaluates_stammdaten_dataframes_on_init():
+    dataframe = pd.DataFrame(
+        {
+            "Nr.": [1, 2, 3, 3],
+            "Firmenname": ["A", "B", "C", "C"],
+            "*WebFirmenID*": [123, None, "", ""],
+            "*firmentupel_apollo*": ["apollo-1", "apollo-2", None, None],
+            "*LeereSpalte*": [None, None, None, None],
+        }
+    )
+
+    instance = cc(
+        ComparisonType.FIRMENABGLEICH,
+        {"Firmenname"},
+        dataframe,
+        "test.xlsx",
+    )
+
+    assert set(instance.stammdaten) == {"WebFirmenID", "firmentupel_apollo"}
+    assert len(instance.stammdaten["WebFirmenID"]) == 1
+    assert len(instance.stammdaten["firmentupel_apollo"]) == 2
+    assert "Firmenname" not in instance.stammdaten["WebFirmenID"].columns
+    assert "LeereSpalte" not in instance.stammdaten["WebFirmenID"].columns

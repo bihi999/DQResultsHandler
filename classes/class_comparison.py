@@ -4,6 +4,7 @@ import logging
 import re
 import pprint
 from .abandoned_classes import ComparisonCompany_ID_wise
+from helper_functions.dataframe_evaluation import evaluate_stammdaten_dataframes
 
 from enum import Enum
 
@@ -91,8 +92,9 @@ class Comparison:
         self.comparison_type = comparison_type
         self.comparison_columns = comparison_columns
         self.comparison_data = comparison_data
-        self.stammdaten = set()
+        self.stammdaten_spalten = set()
         self.extract_stammdaten_and_normalize_column_names()
+        self.stammdaten = evaluate_stammdaten_dataframes(self.comparison_data, self.comparison_columns)
         self.sourcefile = sourcefile
         self.comparison_count = 0
         self.doublet_groups = {}
@@ -241,7 +243,7 @@ class Comparison:
         for column_name in self.comparison_data.columns:
             normalized_column_name = self._remove_column_name_stars(column_name)
             if isinstance(column_name, str) and "*" in column_name:
-                self.stammdaten.add(normalized_column_name)
+                self.stammdaten_spalten.add(normalized_column_name)
             normalized_column_names.append(normalized_column_name)
 
         self.comparison_data.columns = normalized_column_names
