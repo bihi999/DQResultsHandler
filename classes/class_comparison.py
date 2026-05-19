@@ -91,6 +91,8 @@ class Comparison:
         self.comparison_type = comparison_type
         self.comparison_columns = comparison_columns
         self.comparison_data = comparison_data
+        self.stammdaten = set()
+        self.extract_stammdaten_and_normalize_column_names()
         self.sourcefile = sourcefile
         self.comparison_count = 0
         self.doublet_groups = {}
@@ -163,6 +165,11 @@ class Comparison:
                 logger.error("menge_aller_spaltennamen muss eine Menge aus Strings sein.")
             raise ComparisonTypeDetectionError("menge_aller_spaltennamen muss eine Menge aus Strings sein.")
 
+        menge_aller_spaltennamen = {
+            Comparison._remove_column_name_stars(column_name)
+            for column_name in menge_aller_spaltennamen
+        }
+
         default_column_names = ComparisonColumnSet.DEFAULT_COLUMN_NAMES.value
         contact_fields = ComparisonColumnSet.CONTACT_FIELDS.value
         spaltennamen_ohne_default = menge_aller_spaltennamen - default_column_names
@@ -221,6 +228,23 @@ class Comparison:
     # Data Frame zunächst zentral aufbereiten.
 
     ORDER_CLEAN_DATA = ["remove_nan_mask", "normalize_column_names", "turn_apolloid_to_apollofirmenid"]
+
+    @staticmethod
+    def _remove_column_name_stars(column_name):
+        if isinstance(column_name, str):
+            return column_name.replace("*", "")
+        return column_name
+
+    def extract_stammdaten_and_normalize_column_names(self):
+        normalized_column_names = []
+
+        for column_name in self.comparison_data.columns:
+            normalized_column_name = self._remove_column_name_stars(column_name)
+            if isinstance(column_name, str) and "*" in column_name:
+                self.stammdaten.add(normalized_column_name)
+            normalized_column_names.append(normalized_column_name)
+
+        self.comparison_data.columns = normalized_column_names
 
     @staticmethod
     def _is_series_string_like(series):
@@ -348,7 +372,7 @@ class Comparison:
         """
         logger.info("Bereinigung Spaltennamen für {} begonnen.".format(self.sourcefile.split("\\")[-1]))
         logger.info("Bestehende Spaltennamen: {}".format(self.comparison_data.columns))
-        self.comparison_data.columns = self.comparison_data.columns.str.replace(r"\*", "", regex=True)
+        self.extract_stammdaten_and_normalize_column_names()
         logger.info("Angepasste Spaltennamen: {}".format(self.comparison_data.columns))
 
     def turn_apolloid_to_apollofirmenid(self, logger):
@@ -415,22 +439,9 @@ class Comparison:
     
     def summarize_company_relations(self, logger): # Die Relationen sind unterschiedlicher Art je nach Abgleichstyp. Die Subklassen müssen sie selbst extrahieren und sie werden nur noch zusammengeführt als df
         """
-            Alt:
-            ComparisonContact-Instanzen durchlaufen und Relationen extrahieren mit deren Klassenmethoden.
-            Zusammenfassen der danach befüllten Attribute in self.found_relations
-
-            Neu:
             Nach Verarbeitung der Dublettengruppen - die klassenspezifisch erfolgt - müssen die Ergebnisse eingesammelt werden, hier die Relationen.
             Je Comparison - Instanz ist eine Tabelle und ein Abgleichstyp vorhanden; die Dublettengruppen können davon nicht abweichen.
             Durchlaufe
-
-            Relationen zwischen Firmen - aktuell keine Klasse - enthalten:
-                ApolloFirmenID
-                Firmenname
-                Ort
-                WebFirmenID
-                Relation
-                Relation_staerke
         """
         
         
@@ -466,13 +477,6 @@ class Comparison:
             for list_entry in doublet_group.new_doubletgroups:    
                 if sr_counter == 0:
                     self.reorganized_doublet_groups = pd.DataFrame(columns = list_entry.columns)
-                    
-                    #pprint.pprint(self.reorganized_doublet_groups)
-                    #pprint.pprint(list_entry)
-                    #print(type(list_entry))
-
-
-
                     self.reorganized_doublet_groups = pd.concat([self.reorganized_doublet_groups, list_entry], ignore_index = True)
                     sr_counter += 1
                 else:

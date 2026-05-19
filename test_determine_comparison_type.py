@@ -11,6 +11,13 @@ def test_detect_comparison_type_firmenabgleich():
     assert cc.detect_comparison_type(comparison_columns, all_columns) == ComparisonType.FIRMENABGLEICH
 
 
+def test_detect_comparison_type_removes_stars_from_all_columns():
+    comparison_columns = {"Firmenname"}
+    all_columns = {"Nr.", "Firmenname", "*WebFirmenID*", "*firmentupel_apollo*"}
+
+    assert cc.detect_comparison_type(comparison_columns, all_columns) == ComparisonType.FIRMENABGLEICH
+
+
 def test_detect_comparison_type_kontaktabgleich():
     comparison_columns = {"Vorname", "Nachname"}
     all_columns = {"Nr.", "Vorname", "Nachname", "WebID", "ApolloMemberID"}

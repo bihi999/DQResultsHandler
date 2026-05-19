@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from pathlib import Path
 
-from classes.class_comparison import Comparison as cc
+from classes.class_comparison import Comparison as cc, ComparisonType
 
 
 testdaten = {}
@@ -31,3 +31,24 @@ def test_datentyp_rueckgabe(urdaten, abgleichstyp):
 
 # test 2: Es wird der Abgleichstyp korrekt ermittelt
 # test 3: ....
+
+
+def test_comparison_extracts_stammdaten_and_normalizes_column_names_on_init():
+    dataframe = pd.DataFrame(
+        {
+            "Nr.": [1],
+            "Firmenname": ["Test GmbH"],
+            "*WebFirmenID*": [123],
+            "*(Nicht aendern) Firma*": ["abc"],
+        }
+    )
+
+    instance = cc(
+        ComparisonType.FIRMENABGLEICH,
+        {"Firmenname"},
+        dataframe,
+        "test.xlsx",
+    )
+
+    assert instance.stammdaten == {"WebFirmenID", "(Nicht aendern) Firma"}
+    assert set(instance.comparison_data.columns) == {"Nr.", "Firmenname", "WebFirmenID", "(Nicht aendern) Firma"}
