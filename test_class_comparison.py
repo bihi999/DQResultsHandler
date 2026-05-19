@@ -104,7 +104,7 @@ def test_comparison_extracts_stammdaten_and_normalizes_column_names_on_init():
     assert {"Nr.", "Firmenname", "WebFirmenID", "(Nicht aendern) Firma"}.issubset(instance.comparison_data.columns)
 
 
-def test_comparison_evaluates_stammdaten_dataframes_on_init():
+def test_comparison_does_not_evaluate_stammdaten_dataframes_on_init():
     dataframe = pd.DataFrame(
         {
             "Nr.": [1, 2, 3, 3],
@@ -123,8 +123,5 @@ def test_comparison_evaluates_stammdaten_dataframes_on_init():
         "test.xlsx",
     )
 
-    assert set(instance.stammdaten) == {"WebFirmenID", "firmentupel_apollo"}
-    assert len(instance.stammdaten["WebFirmenID"]) == 1
-    assert len(instance.stammdaten["firmentupel_apollo"]) == 2
-    assert "Firmenname" not in instance.stammdaten["WebFirmenID"].columns
-    assert "LeereSpalte" not in instance.stammdaten["WebFirmenID"].columns
+    assert not hasattr(instance, "stammdaten")
+    assert instance.comparison_data is prepared_dataframe

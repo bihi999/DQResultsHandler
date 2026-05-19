@@ -43,7 +43,7 @@ def evaluate_stammdaten_dataframes(dataframe, columns_to_delete=None, logger=Non
 
         id_dataframe = id_dataframe.replace(r"^\s*$", pd.NA, regex=True)
         id_dataframe = id_dataframe.dropna(axis=1, how="all")
-        id_dataframe = id_dataframe.drop_duplicates()
+        id_dataframe = id_dataframe.drop_duplicates(subset=[id_column])
 
         if not id_dataframe.empty:
             stammdaten[id_column] = id_dataframe
@@ -106,48 +106,3 @@ def enrich_dataframe_with_stammdaten(stammdaten, dataframe, logger=None):
 
     logger.info("Anreicherung abgeschlossen: %s Zeilen, %s Spalten.", len(enriched_dataframe), len(enriched_dataframe.columns))
     return enriched_dataframe
-
-
-def combine_stammdaten_from_comparisons(comparisons, logger=None):
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
-    combined_stammdaten = {}
-
-    for comparison_index, comparison in enumerate(comparisons, start=1):
-        stammdaten = getattr(comparison, "stammdaten", None)
-        if not isinstance(stammdaten, dict):
-            logger.info("Comparison %s enthaelt kein Stammdaten-Dict.", comparison_index)
-            continue
-
-        for id_column in ID_COLUMNS:
-            if id_column not in stammdaten:
-                continue
-
-            dataframe = stammdaten[id_column]
-            if not isinstance(dataframe, pd.DataFrame):
-                logger.error("Comparison %s: Stammdaten fuer '%s' sind kein DataFrame.", comparison_index, id_column)
-                continue
-
-            if dataframe.empty:
-                logger.info("Comparison %s: Stammdaten fuer '%s' sind leer.", comparison_index, id_column)
-                continue
-
-            combined_stammdaten.setdefault(id_column, []).append(dataframe.copy())
-            logger.info("Comparison %s: Stammdaten fuer '%s' zum Zusammenfuehren vorgemerkt.", comparison_index, id_column)
-
-    for id_column, dataframes in list(combined_stammdaten.items()):
-        combined_dataframe = pd.concat(dataframes, ignore_index=True)
-        combined_dataframe = combined_dataframe.drop_duplicates()
-        combined_dataframe = combined_dataframe.dropna(axis=1, how="all")
-        combined_stammdaten[id_column] = combined_dataframe
-        logger.info(
-            "Stammdaten fuer '%s' zusammengefuehrt: %s DataFrames, %s Zeilen, %s Spalten.",
-            id_column,
-            len(dataframes),
-            len(combined_dataframe),
-            len(combined_dataframe.columns),
-        )
-
-    logger.info("Zusammengefuehrtes Stammdaten-Dict enthaelt %s Eintraege.", len(combined_stammdaten))
-    return combined_stammdaten

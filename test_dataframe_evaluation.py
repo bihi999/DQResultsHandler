@@ -1,6 +1,6 @@
 import pandas as pd
 
-from helper_functions.dataframe_evaluation import combine_stammdaten_from_comparisons, enrich_dataframe_with_stammdaten
+from helper_functions.dataframe_evaluation import evaluate_stammdaten_dataframes, enrich_dataframe_with_stammdaten
 
 
 def test_enrich_dataframe_with_stammdaten_left_joins_without_duplicate_id():
@@ -32,42 +32,21 @@ def test_enrich_dataframe_with_stammdaten_left_joins_without_duplicate_id():
     assert pd.isna(enriched_dataframe.loc[2, "WebFirmenID_Firmenname"])
 
 
-def test_combine_stammdaten_from_comparisons_keeps_dict_structure_and_deduplicates():
-    class ComparisonStub:
-        def __init__(self, stammdaten):
-            self.stammdaten = stammdaten
+def test_evaluate_stammdaten_dataframes_keeps_dict_structure_and_deduplicates():
+    dataframe = pd.DataFrame(
+        {
+            "WebFirmenID": [1, 2, 2, None],
+            "WebID": [None, None, 10, 11],
+            "Firmenname": ["A GmbH", "B GmbH", "B GmbH", "C GmbH"],
+            "Abgleichsspalte": ["x", "y", "y", "z"],
+            "LeereSpalte": [None, None, None, None],
+        }
+    )
 
-    comparisons = [
-        ComparisonStub(
-            {
-                "WebFirmenID": pd.DataFrame(
-                    {
-                        "WebFirmenID": [1, 2],
-                        "Firmenname": ["A GmbH", "B GmbH"],
-                    }
-                )
-            }
-        ),
-        ComparisonStub(
-            {
-                "WebFirmenID": pd.DataFrame(
-                    {
-                        "WebFirmenID": [2, 3],
-                        "Firmenname": ["B GmbH", "C GmbH"],
-                    }
-                ),
-                "WebID": pd.DataFrame(
-                    {
-                        "WebID": [10],
-                        "Name": ["Max"],
-                    }
-                ),
-            }
-        ),
-    ]
+    stammdaten = evaluate_stammdaten_dataframes(dataframe, {"Abgleichsspalte"})
 
-    combined = combine_stammdaten_from_comparisons(comparisons)
-
-    assert set(combined) == {"WebFirmenID", "WebID"}
-    assert len(combined["WebFirmenID"]) == 3
-    assert len(combined["WebID"]) == 1
+    assert set(stammdaten) == {"WebFirmenID", "WebID"}
+    assert len(stammdaten["WebFirmenID"]) == 2
+    assert len(stammdaten["WebID"]) == 2
+    assert "Abgleichsspalte" not in stammdaten["WebFirmenID"].columns
+    assert "LeereSpalte" not in stammdaten["WebID"].columns

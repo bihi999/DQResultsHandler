@@ -4,7 +4,6 @@ import logging
 import re
 import pprint
 from .abandoned_classes import ComparisonCompany_ID_wise
-from helper_functions.dataframe_evaluation import evaluate_stammdaten_dataframes
 
 from enum import Enum
 
@@ -94,7 +93,6 @@ class Comparison:
         self.comparison_columns = comparison_columns
         self.comparison_data = comparison_data
         self.stammdaten_spalten = set(comparison_data.attrs.get("stammdaten_spalten", set()))
-        self.stammdaten = evaluate_stammdaten_dataframes(self.comparison_data, self.comparison_columns)
         self.sourcefile = sourcefile
         self.comparison_count = 0
         self.doublet_groups = {}

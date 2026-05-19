@@ -14,7 +14,7 @@ from classes.abandoned_classes import ComparisonCompany_ID_wise
 from excel_functions import excel_classes as ec
 
 from helper_functions.pandas_functions import export_dataframe_to_excel
-from helper_functions.dataframe_evaluation import combine_stammdaten_from_comparisons, enrich_dataframe_with_stammdaten
+from helper_functions.dataframe_evaluation import IdColumn, enrich_dataframe_with_stammdaten, evaluate_stammdaten_dataframes
 
 
 DataFrames = {}
@@ -55,6 +55,8 @@ else:
 if DQFileFolder.excel_file_list:
     DataFrames = DQFileFolder.load_all_excel_files_as_dataframes(logger)
 
+stammdaten = {id_column.value: pd.DataFrame(columns=[id_column.value]) for id_column in IdColumn}
+
 # Logik von class_comparison als FactoryKlasse wird hier durchbrochen - __main__ entscheidet über Klassenverwendung
 # weil hier die Auswertung bereits genutzt wird und nicht innerhalb der cc-Instanz. JEDE Tabelle erhält eine Comparison-Instanz.
 # Darin liegt dann die weitere Verarbeitung.
@@ -76,15 +78,22 @@ for quelldatei, _DataFrame in DataFrames.items():
     if menge_abgleichsspalten:
         try:
             comparison_type = cc.Comparison.detect_comparison_type(menge_abgleichsspalten, set(_DataFrame.columns), logger)
+            evaluated_stammdaten = evaluate_stammdaten_dataframes(_DataFrame, menge_abgleichsspalten, logger)
+            for id_column in IdColumn:
+                id_column_name = id_column.value
+                if id_column_name not in evaluated_stammdaten:
+                    continue
+
+                stammdaten[id_column_name] = pd.concat(
+                    [stammdaten[id_column_name], evaluated_stammdaten[id_column_name]],
+                    ignore_index=True,
+                ).drop_duplicates().dropna(axis=1, how="all")
             DQComparisonInstanzen.append(cc.Comparison(comparison_type, menge_abgleichsspalten, _DataFrame, quelldatei))
         except cc.ComparisonTypeDetectionError:
             continue
     else:
         logger.info("Es wurden keine Abgleichsspalten ermittelt - keine Auswertung möglich.")
         continue
-
-#------------------------READING
-stammdaten = combine_stammdaten_from_comparisons(DQComparisonInstanzen, logger)
 
 for DQComparisonInstanz in DQComparisonInstanzen:
     #logger.info("Beginne Bearbeitung für Instanz {}.".format(DQComparisonInstanz))
