@@ -5,6 +5,16 @@ import re
 import pprint
 from .abandoned_classes import ComparisonCompany_ID_wise
 
+from enum import Enum
+
+
+class ComparisonType(Enum):
+    """
+        Definition einer festen Menge der Arten von erwarteten Abgleichen.
+    """
+    FIRMENABGLEICH = "firmenabgleich"
+    KONTAKTABGLEICH = "kontaktabgleich"
+
 
 class Comparison:
     """
@@ -30,7 +40,7 @@ class Comparison:
 
     """
     
-    def __init__(self, comparison_type, comparison_columns, comparison_data, sourcefile):
+    def __init__(self, comparison_type: ComparisonType, comparison_columns, comparison_data, sourcefile):
         self.comparison_type = comparison_type
         self.comparison_columns = comparison_columns
         self.comparison_data = comparison_data
@@ -39,6 +49,17 @@ class Comparison:
         self.doublet_groups = {}
         self.found_relations = pd.DataFrame()
         self.reorganized_doublet_groups = pd.DataFrame()
+
+    @property
+    def comparison_type(self):
+        return self._comparison_type
+
+    @comparison_type.setter
+    def comparison_type(self, comparison_type):
+        if not isinstance(comparison_type, ComparisonType):
+            raise TypeError("comparison_type muss ein Wert der Klasse ComparisonType sein.")
+
+        self._comparison_type = comparison_type
         
         
     default_column_names = set(["Nr.", "löschen", "%", "UnvollständigerDatensatz", "Tabelle"])
